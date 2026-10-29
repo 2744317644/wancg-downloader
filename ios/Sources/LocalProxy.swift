@@ -259,12 +259,12 @@ final class ProxySession {
             let port = try LocalProxy.shared.start()
             proxyPort = port
             configuration.connectionProxyDictionary = [
-                kCFNetworkProxiesHTTPEnable as String: true,
-                kCFNetworkProxiesHTTPProxy as String: "127.0.0.1",
-                kCFNetworkProxiesHTTPPort as String: Int(port),
-                kCFNetworkProxiesHTTPSEnable as String: true,
-                kCFNetworkProxiesHTTPSProxy as String: "127.0.0.1",
-                kCFNetworkProxiesHTTPSPort as String: Int(port),
+                "HTTPEnable": true,
+                "HTTPProxy": "127.0.0.1",
+                "HTTPPort": Int(port),
+                "HTTPSEnable": true,
+                "HTTPSProxy": "127.0.0.1",
+                "HTTPSPort": Int(port),
             ]
         } catch {
             startupError = error
