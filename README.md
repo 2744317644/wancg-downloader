@@ -10,6 +10,8 @@
 
 源码在 [`ios/`](ios/)，构建流程在 [`.github/workflows/ios.yml`](.github/workflows/ios.yml)。
 
+**直接下载 unsigned IPA：** [v1.0.0 Release](https://github.com/2744317644/wancg-downloader/releases/tag/v1.0.0)
+
 ### 从 GitHub Actions 下载 IPA
 
 1. 打开仓库的 **Actions** → **Build iOS IPA**；
@@ -45,6 +47,17 @@
 - `DoHResolver`：通过 `doh.pub` 解析真实 IP，内置实测备用 IP；
 - `URLSession` 走这个本地代理，TLS SNI 仍然是原域名，证书正常校验；
 - `ZIPFoundation` 解压，`UIGraphicsPDFRenderer` 生成 PDF。
+
+### CI 已验证
+
+GitHub Actions 每次构建都会先跑一个 macOS smoke test：
+
+- 通过 App 内的本地 CONNECT 代理访问 wnacg；
+- 解析标题、197 页、封面；
+- 下载一个约 10 MB 的测试 ZIP；
+- 用 ZIPFoundation 解压出 53 张图片。
+
+这几步通过后才会打包 IPA，因此下载链路、解析、解压都是实际跑通过的。
 
 ### 本地构建（需要 Mac）
 
