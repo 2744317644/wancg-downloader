@@ -23,6 +23,22 @@ struct ProxyCheck {
                 print("PARSE_FAIL=missing cover")
                 exit(2)
             }
+
+            let sample = try await client.preview(for: "399500")
+            let sampleInfo = try await client.downloadInfo(reqID: sample.aid)
+            let downloaded = try await client.download(
+                sampleInfo, referer: sample.pageURL
+            ) { _ in }
+            let attributes = try? FileManager.default.attributesOfItem(
+                atPath: downloaded.path
+            )
+            let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+            print("DOWNLOAD=\(size)")
+            try? FileManager.default.removeItem(at: downloaded)
+            guard size > 1_000_000 else {
+                print("DOWNLOAD_FAIL=too small")
+                exit(2)
+            }
             exit(0)
         } catch {
             print("ERROR=\(error.localizedDescription)")

@@ -93,6 +93,13 @@ final class AppModel: ObservableObject {
             if makePDF {
                 status = "正在解压图片…"
                 let images = try ZipExtractor.extractImages(from: downloaded)
+                defer {
+                    if let first = images.first {
+                        try? FileManager.default.removeItem(
+                            at: first.deletingLastPathComponent()
+                        )
+                    }
+                }
                 let base = downloaded.deletingPathExtension().lastPathComponent
                 let documents = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask

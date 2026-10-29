@@ -33,6 +33,7 @@ targets:
         UIApplicationSupportsIndirectInputEvents: true
         NSLocalNetworkUsageDescription: 用于连接本机的下载代理。
         NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
