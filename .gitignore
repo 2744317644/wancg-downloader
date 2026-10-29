@@ -1,0 +1,15 @@
+downloads/
+__pycache__/
+*.pyc
+*.part
+.dsh-office-*/
+.edge-profile*/
+.jsdom-test/
+preview_sample.html
+ios/build/
+ios/build.log
+ios/DerivedData/
+ios/*.xcodeproj
+ios/Info.plist
+*.ipa
+.DS_Store
