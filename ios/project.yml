@@ -68,7 +68,10 @@ targets:
       - path: Sources/WnacgClient.swift
       - path: Sources/HTMLParser.swift
       - path: Sources/Models.swift
+      - path: Sources/ZipExtractor.swift
       - path: TestMain.swift
+    dependencies:
+      - package: ZIPFoundation
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wancg.proxycheck
