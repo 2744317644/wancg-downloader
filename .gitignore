@@ -8,6 +8,8 @@ __pycache__/
 .gh-artifacts/
 .gh-cache/
 push_github.py
+push_all.py
+push_icons.py
 preview_sample.html
 ios/build/
 ios/build.log

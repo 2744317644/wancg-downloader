@@ -65,7 +65,8 @@ GitHub Actions 每次构建都会先跑一个 macOS smoke test：
 
 ### 本地构建（需要 Mac）
 
-需要 **Xcode 26.6**（iOS 26 SDK）。GitHub Actions 使用 `macos-26` runner（默认 Xcode 26.6）。
+需要 **Xcode 26.3+**（iOS 26 SDK）。GitHub Actions 使用 `macos-15` runner，
+并切换到 `/Applications/Xcode_26.3.app`。
 
 ```bash
 brew install xcodegen
