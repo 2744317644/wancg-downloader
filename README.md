@@ -10,7 +10,9 @@
 
 源码在 [`ios/`](ios/)，构建流程在 [`.github/workflows/ios.yml`](.github/workflows/ios.yml)。
 
-**直接下载 unsigned IPA：** [v1.0.0 Release](https://github.com/2744317644/wancg-downloader/releases/tag/v1.0.0)
+**直接下载 unsigned IPA：** [最新 Release](https://github.com/2744317644/wancg-downloader/releases/latest)
+
+> App 图标使用站点 Logo（看板娘 + 紳士漫畫字标）制作。
 
 ### 从 GitHub Actions 下载 IPA
 
