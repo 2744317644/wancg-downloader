@@ -10,11 +10,14 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen

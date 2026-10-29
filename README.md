@@ -37,18 +37,20 @@
 
 ### App 功能
 
-- 粘贴作品链接或编号，解析封面、标题、页数、标签；
-- 下载 ZIP，解压后按文件名自然排序；
-- 生成 300 DPI、最高质量 PDF；
-- ZIP / PDF 保存到 App 的 Documents，可通过系统分享保存到“文件”；
-- 内置 DoH + 本地 CONNECT 代理：解析真实 IP 后直连，不依赖系统代理。
+- **首页**：内置 WKWebView 直接浏览 wnacg 首页，使用本地 DoH CONNECT 代理加载网页和图片；
+- **下载**：粘贴链接，解析封面、标题、页数、标签；下载 ZIP、解压、生成 300 DPI PDF；
+- **文件**：浏览 App Documents 里的 ZIP / PDF，点击 PDF 直接预览（PDFKit），支持分享和删除；
+- 底部 **Liquid Glass 页签**：使用 iOS 26 SDK 的系统 `TabView`，自动获得液态玻璃外观，
+  并启用 `tabBarMinimizeBehavior(.onScrollDown)` 滚动收起；
+- 旧系统（iOS 17–25）使用标准系统页签，不会崩溃。
 
 ### 实现说明
 
 - `LocalProxy`：在 App 内启动 `127.0.0.1` 的 HTTP CONNECT 代理；
 - `DoHResolver`：通过 `doh.pub` 解析真实 IP，内置实测备用 IP；
-- `URLSession` 走这个本地代理，TLS SNI 仍然是原域名，证书正常校验；
-- `ZIPFoundation` 解压，`UIGraphicsPDFRenderer` 生成 PDF。
+- `URLSession` 与 WKWebView 都走这个本地代理（WKWebView 用
+  `WKWebsiteDataStore.proxyConfigurations`），TLS SNI 仍然是原域名，证书正常校验；
+- `ZIPFoundation` 解压，`UIGraphicsPDFRenderer` 生成 PDF，`PDFKit` 预览。
 
 ### CI 已验证
 
@@ -62,6 +64,8 @@ GitHub Actions 每次构建都会先跑一个 macOS smoke test：
 这几步通过后才会打包 IPA，因此下载链路、解析、解压都是实际跑通过的。
 
 ### 本地构建（需要 Mac）
+
+需要 **Xcode 26.6**（iOS 26 SDK）。GitHub Actions 使用 `macos-26` runner（默认 Xcode 26.6）。
 
 ```bash
 brew install xcodegen

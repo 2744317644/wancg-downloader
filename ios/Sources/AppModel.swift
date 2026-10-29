@@ -123,6 +123,9 @@ final class AppModel: ObservableObject {
                 status = "完成：ZIP"
             }
             downloadProgress = 1
+            NotificationCenter.default.post(
+                name: .downloadsChanged, object: nil
+            )
         } catch {
             errorMessage = error.localizedDescription
             status = "下载失败"
