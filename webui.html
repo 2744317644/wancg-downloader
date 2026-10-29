@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>wnacg 漫画下载器 · Web UI</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="wnacg">
+<meta name="theme-color" content="#0a0d13">
+<meta name="format-detection" content="telephone=no">
+<style>
+  :root{
+    --bg:#0a0d13;
+    --panel:rgba(18,23,34,.86);
+    --panel-2:#0d121b;
+    --line:rgba(255,255,255,.08);
+    --line-strong:rgba(255,255,255,.14);
+    --text:#e6edf7;
+    --muted:#8b96a8;
+    --accent:#5eead4;
+    --accent-2:#60a5fa;
+    --danger:#f87171;
+    --ok:#34d399;
+    --warn:#fbbf24;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,-apple-system,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 620px at 18% -12%, rgba(37,99,235,.22), transparent 62%),
+      radial-gradient(900px 500px at 100% 0%, rgba(20,184,166,.14), transparent 55%),
+      var(--bg);
+    min-height:100vh;
+    padding-bottom:env(safe-area-inset-bottom);
+    -webkit-text-size-adjust:100%;
+    -webkit-tap-highlight-color:transparent;
+  }
+  a{color:inherit}
+  button{font:inherit}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 22px 56px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:calc(30px + env(safe-area-inset-top)) 0 22px}
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+  .logo{
+    width:46px;height:46px;border-radius:14px;flex:none;
+    display:grid;place-items:center;font-weight:800;font-size:22px;color:#061018;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    box-shadow:0 8px 26px rgba(94,234,212,.18);
+  }
+  h1{font-size:20px;line-height:1.2;margin:0;letter-spacing:.2px}
+  .subtitle{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
+  .version{
+    font-size:12px;color:var(--muted);border:1px solid var(--line);
+    padding:6px 10px;border-radius:999px;white-space:nowrap;
+    background:rgba(255,255,255,.02);
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:0 20px 60px rgba(0,0,0,.30);
+    backdrop-filter:blur(12px);
+  }
+  .input-panel{padding:20px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:20px;align-items:start}
+  .main-col{min-width:0}
+  .side-col{position:sticky;top:20px;min-width:0}
+  .preview-panel{padding:16px;overflow:hidden}
+  .preview-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .preview-head h2{font-size:14px;margin:0}
+  .preview-state{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .preview-body{min-height:120px}
+  .preview-empty{
+    padding:44px 16px;text-align:center;border:1px dashed rgba(255,255,255,.12);
+    border-radius:12px;color:var(--muted);font-size:12.5px;line-height:1.7;
+  }
+  .preview-empty-icon{font-size:26px;opacity:.5;margin-bottom:6px}
+  .preview-cover{
+    position:relative;width:100%;aspect-ratio:240/302;border-radius:12px;overflow:hidden;
+    background:linear-gradient(145deg,#121b2a,#0a0e15);border:1px solid var(--line);
+  }
+  .preview-cover img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
+  .preview-cover .cover-fallback{
+    position:absolute;inset:0;display:grid;place-items:center;color:#64748b;font-size:12px;
+    background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 10px,transparent 10px 20px);
+  }
+  .preview-title{font-size:14px;font-weight:650;line-height:1.55;margin:12px 0 10px;word-break:break-word}
+  .preview-meta{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+  .preview-meta-row{display:flex;gap:10px;justify-content:space-between}
+  .preview-meta-row span:last-child{
+    color:#c8d2e1;text-align:right;word-break:break-word;max-width:72%;
+  }
+  .preview-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .preview-tag{
+    font-size:11px;padding:3px 7px;border-radius:999px;
+    background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.18);color:#bfdbfe;
+  }
+  .preview-actions{display:flex;gap:8px;margin-top:12px}
+  .preview-actions a, .preview-actions button{
+    flex:1;text-align:center;text-decoration:none;border:1px solid var(--line-strong);
+    border-radius:9px;padding:8px 10px;font-size:12.5px;color:#dbeafe;
+    background:rgba(255,255,255,.035);cursor:pointer;font-family:inherit;
+  }
+  .preview-actions a:hover, .preview-actions button:hover{
+    background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.24);
+  }
+  .preview-actions button{
+    background:linear-gradient(135deg,rgba(94,234,212,.16),rgba(96,165,250,.16));
+    border-color:rgba(94,234,212,.28);color:#d1fae5;font-weight:600;
+  }
+  .preview-loading{padding:38px 10px;text-align:center;color:var(--muted);font-size:12.5px}
+  .preview-error{
+    padding:14px;border-radius:12px;background:rgba(248,113,113,.07);
+    border:1px solid rgba(248,113,113,.2);color:#fecaca;font-size:12px;
+    line-height:1.6;white-space:pre-wrap;word-break:break-word;
+  }
+  .preview-note{font-size:11px;color:#5f6a7d;margin-top:10px;line-height:1.5}
+  .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .panel-head h2,.list-head h2{font-size:15px;margin:0;letter-spacing:.2px}
+  .hint{font-size:12px;color:var(--muted)}
+  textarea{
+    width:100%;min-height:108px;resize:vertical;
+    background:var(--panel-2);color:var(--text);
+    border:1px solid var(--line);border-radius:12px;
+    padding:13px 14px;font:13px/1.65 "Cascadia Mono","Consolas","Microsoft YaHei",monospace;
+    outline:none;transition:border-color .18s, box-shadow .18s;
+  }
+  textarea:focus{border-color:rgba(94,234,212,.45);box-shadow:0 0 0 3px rgba(94,234,212,.08)}
+  textarea::placeholder{color:#5f6a7d}
+  .options{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:14px}
+  .check{display:flex;align-items:center;gap:7px;font-size:13px;color:#c8d2e1;cursor:pointer;user-select:none}
+  .check input{width:15px;height:15px;accent-color:#5eead4;cursor:pointer}
+  .select{display:flex;align-items:center;gap:7px;font-size:13px;color:#c8d2e1}
+  select{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:6px 8px;font-size:13px;outline:none;
+  }
+  .primary{
+    margin-left:auto;border:0;border-radius:12px;padding:11px 22px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#061018;font-weight:750;font-size:14px;cursor:pointer;
+    box-shadow:0 8px 24px rgba(96,165,250,.18);
+    transition:transform .15s, filter .15s, opacity .15s;
+  }
+  .primary:hover{transform:translateY(-1px);filter:brightness(1.05)}
+  .primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  .form-error{display:none;color:var(--danger);font-size:12.5px;margin-top:10px}
+  .form-error.show{display:block}
+  .meta-bar{
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    margin:18px 0 26px;padding:12px 16px;border:1px solid var(--line);
+    border-radius:14px;background:rgba(255,255,255,.02);
+  }
+  .meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);min-width:0}
+  .meta code{
+    color:#c8d2e1;background:rgba(255,255,255,.04);
+    padding:4px 8px;border-radius:7px;font-size:12px;
+    max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .meta-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .ghost{
+    border:1px solid var(--line-strong);background:rgba(255,255,255,.03);
+    color:#c8d2e1;border-radius:10px;padding:7px 12px;font-size:12.5px;
+    cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .ghost:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.22)}
+  .list-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 12px}
+  .summary{font-size:12px;color:var(--muted)}
+  .jobs{display:grid;gap:14px}
+  .job{
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:17px 18px;box-shadow:0 14px 40px rgba(0,0,0,.20);
+    border-left:3px solid transparent;
+  }
+  .job.running{border-left-color:var(--accent-2)}
+  .job.done{border-left-color:var(--ok)}
+  .job.skipped{border-left-color:#2dd4bf}
+  .job.error{border-left-color:var(--danger)}
+  .job.cancelled{border-left-color:#64748b}
+  .job.queued{border-left-color:#64748b}
+  .job-top{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
+  .job-title{font-size:14.5px;font-weight:650;line-height:1.45;word-break:break-word;min-width:0}
+  .job-filename{font-size:12px;color:var(--muted);margin-top:3px;word-break:break-all}
+  .badge{
+    flex:none;font-size:11.5px;padding:4px 9px;border-radius:999px;
+    border:1px solid var(--line);color:var(--muted);white-space:nowrap;
+    background:rgba(255,255,255,.03);
+  }
+  .badge.running{color:#bfdbfe;border-color:rgba(96,165,250,.35);background:rgba(96,165,250,.10)}
+  .badge.done{color:#a7f3d0;border-color:rgba(52,211,153,.32);background:rgba(52,211,153,.09)}
+  .badge.skipped{color:#99f6e4;border-color:rgba(45,212,191,.30);background:rgba(45,212,191,.08)}
+  .badge.error{color:#fecaca;border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.10)}
+  .badge.cancelled{color:#cbd5e1;border-color:rgba(148,163,184,.30);background:rgba(148,163,184,.08)}
+  .progress{
+    position:relative;height:8px;border-radius:999px;overflow:hidden;
+    background:rgba(255,255,255,.055);margin:14px 0 9px;
+  }
+  .bar{
+    height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    transition:width .35s ease;
+  }
+  .bar.done{background:linear-gradient(90deg,#34d399,#22d3ee)}
+  .bar.error{background:linear-gradient(90deg,#f87171,#fb7185)}
+  .bar.cancelled{background:#64748b}
+  .bar.indeterminate{width:30%;animation:indet 1.15s ease-in-out infinite}
+  @keyframes indet{
+    0%{transform:translateX(-110%)}
+    100%{transform:translateX(380%)}
+  }
+  .job-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .job-meta .pct{color:#dbeafe;font-variant-numeric:tabular-nums;font-weight:600}
+  .job-meta .phase{color:#a5b4c8}
+  .spinner{
+    width:11px;height:11px;border-radius:50%;display:inline-block;
+    border:2px solid rgba(255,255,255,.18);border-top-color:var(--accent-2);
+    animation:spin .8s linear infinite;vertical-align:-1px;margin-right:5px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .error-box{
+    margin-top:11px;padding:10px 12px;border-radius:10px;
+    background:rgba(248,113,113,.075);border:1px solid rgba(248,113,113,.22);
+    color:#fecaca;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;
+  }
+  .job-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .job-actions a, .job-actions button{
+    text-decoration:none;border:1px solid var(--line-strong);border-radius:9px;
+    padding:7px 11px;font-size:12.5px;color:#dbeafe;background:rgba(255,255,255,.035);
+    transition:background .15s,border-color .15s;cursor:pointer;
+  }
+  .job-actions a:hover, .job-actions button:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.24)}
+  .job-actions button:disabled{opacity:.5;cursor:not-allowed}
+  details.logs{margin-top:11px}
+  details.logs summary{
+    cursor:pointer;color:var(--muted);font-size:12px;user-select:none;
+    width:max-content;padding:2px 0;
+  }
+  details.logs summary:hover{color:#c8d2e1}
+  details.logs pre{
+    margin:9px 0 0;padding:11px 12px;border-radius:10px;
+    background:#090d14;border:1px solid var(--line);
+    color:#9fb0c7;font:11.5px/1.65 "Cascadia Mono","Consolas",monospace;
+    max-height:190px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+  }
+  .empty{
+    text-align:center;padding:48px 20px;border:1px dashed rgba(255,255,255,.12);
+    border-radius:16px;color:var(--muted);background:rgba(255,255,255,.012);
+  }
+  .empty .icon{font-size:30px;opacity:.55;margin-bottom:8px}
+  .empty h3{margin:0 0 6px;font-size:14.5px;color:#c8d2e1;font-weight:600}
+  .empty p{margin:0;font-size:12.5px}
+  .conn{
+    display:none;margin-bottom:16px;padding:11px 14px;border-radius:12px;
+    border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.08);
+    color:#fde68a;font-size:12.5px;
+  }
+  .conn.show{display:block}
+  .toast{
+    position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);
+    background:#111827;border:1px solid rgba(255,255,255,.16);color:#e5edf9;
+    padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;box-shadow:0 18px 50px rgba(0,0,0,.45);
+    z-index:20;max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  footer{margin-top:28px;text-align:center;color:#5f6a7d;font-size:11.5px;line-height:1.7}
+  @media (max-width:980px){
+    .layout{grid-template-columns:1fr}
+    .side-col{position:static}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 14px 40px}
+    header{padding-top:calc(20px + env(safe-area-inset-top))}
+    h1{font-size:17px}
+    .logo{width:40px;height:40px;font-size:19px;border-radius:12px}
+    .primary{margin-left:0;width:100%}
+    .options{gap:12px}
+    .meta code{max-width:210px}
+    .meta-actions{margin-left:0;width:100%}
+    .job{padding:15px}
+    textarea, select{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">W</div>
+      <div>
+        <h1>wnacg 漫画下载器</h1>
+        <p class="subtitle">ZIP + PDF · 本地实时进度</p>
+      </div>
+    </div>
+    <div class="version" id="version">v1.5.0</div>
+  </header>
+
+  <div class="layout">
+    <div class="main-col">
+      <div class="conn" id="conn">无法连接本地服务，请确认启动窗口仍在运行…</div>
+
+      <section class="panel input-panel">
+        <div class="panel-head">
+          <h2>下载链接</h2>
+          <span class="hint">一行一个，支持一次粘贴多个作品链接</span>
+        </div>
+        <textarea id="urls" spellcheck="false"
+          placeholder="https://www.wnacg.com/photos-index-aid-383877.html&#10;&#10;也可以直接写编号，例如 383877"></textarea>
+        <div class="options">
+          <label class="check"><input type="checkbox" id="pdf" checked> 同时生成 PDF</label>
+          <label class="select">PDF DPI
+            <select id="dpi">
+              <option value="120">120</option>
+              <option value="150">150</option>
+              <option value="200">200</option>
+              <option value="300" selected>300（最高）</option>
+            </select>
+          </label>
+          <label class="select">JPG 质量
+            <select id="quality">
+              <option value="90">90</option>
+              <option value="95">95</option>
+              <option value="100" selected>100（最高）</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="overwrite"> 覆盖已有文件</label>
+          <button class="primary" id="submit">开始下载</button>
+        </div>
+        <div class="form-error" id="formError"></div>
+      </section>
+
+      <div class="meta-bar">
+        <div class="meta">保存目录 <code id="outputDir">…</code></div>
+        <div class="meta">代理 <code id="proxy">…</code></div>
+        <div class="meta-actions">
+          <button class="ghost" id="openFolder">打开文件夹</button>
+          <button class="ghost" id="clearDone">清空已完成</button>
+        </div>
+      </div>
+
+      <div class="list-head">
+        <h2>任务</h2>
+        <span class="summary" id="summary"></span>
+      </div>
+      <div class="jobs" id="jobs">
+        <div class="empty">
+          <div class="icon">▤</div>
+          <h3>还没有任务</h3>
+          <p>在上面粘贴作品链接，点击“开始下载”。</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side-col">
+      <section class="panel preview-panel">
+        <div class="preview-head">
+          <h2>作品预览</h2>
+          <span class="preview-state" id="previewState">等待链接</span>
+        </div>
+        <div class="preview-body" id="previewBody">
+          <div class="preview-empty">
+            <div class="preview-empty-icon">▧</div>
+            粘贴作品链接后，这里会显示封面和详情
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <footer>
+    服务仅监听本机 127.0.0.1 · 关闭启动窗口或按 Ctrl+C 停止<br>
+    请勿高频请求，仅用于个人备份
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const jobsEl = $("jobs");
+  const previewBody = $("previewBody");
+  const previewState = $("previewState");
+  const expanded = new Set();
+  let pollTimer = null;
+  let pollFailures = 0;
+  let submitting = false;
+  let previewTimer = null;
+  let previewSeq = 0;
+  let previewCurrent = "";
+
+  const STATUS_TEXT = {
+    queued: "排队中",
+    running: "进行中",
+    done: "已完成",
+    skipped: "已跳过",
+    error: "失败",
+    cancelled: "已取消",
+  };
+  const PHASE_TEXT = {
+    queued: "等待中",
+    resolving: "解析链接",
+    downloading: "下载中",
+    pdf: "生成 PDF",
+    done: "完成",
+    error: "失败",
+    cancelled: "已取消",
+  };
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
+  }
+
+  function fmtBytes(bytes) {
+    if (bytes == null || bytes < 0 || Number.isNaN(Number(bytes))) return "—";
+    const n = Number(bytes);
+    if (n < 1024) return n.toFixed(0) + " B";
+    const units = ["KB", "MB", "GB", "TB"];
+    let value = n / 1024;
+    let index = 0;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index += 1;
+    }
+    return value.toFixed(value >= 100 ? 0 : 1) + " " + units[index];
+  }
+
+  function showToast(message) {
+    const el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function showFormError(message) {
+    const el = $("formError");
+    el.textContent = message || "";
+    el.classList.toggle("show", Boolean(message));
+  }
+
+  async function api(path, options) {
+    const response = await fetch(path, Object.assign({ cache: "no-store" }, options || {}));
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (error) {
+      throw new Error("服务返回了无法解析的内容");
+    }
+    if (!response.ok || !data || data.ok === false) {
+      throw new Error((data && data.error) || ("HTTP " + response.status));
+    }
+    return data;
+  }
+
+  function previewEmpty() {
+    previewState.textContent = "等待链接";
+    previewBody.innerHTML =
+      '<div class="preview-empty"><div class="preview-empty-icon">▧</div>' +
+      "粘贴作品链接后，这里会显示封面和详情</div>";
+  }
+
+  function renderPreview(data, multiple) {
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    const visibleTags = tags.slice(0, 8);
+    const more = Math.max(0, (data.tag_count || tags.length) - visibleTags.length);
+    const meta = [];
+    if (data.category) meta.push(["分类", data.category]);
+    if (data.pages) meta.push(["页数", data.pages + " P"]);
+    if (data.uploader) meta.push(["投稿", data.uploader]);
+    if (data.uploaded) meta.push(["上传", data.uploaded]);
+    if (data.favorites != null) meta.push(["收藏", data.favorites]);
+
+    const metaHtml = meta.map(([key, value]) =>
+      '<div class="preview-meta-row"><span>' + esc(key) +
+      "</span><span>" + esc(value) + "</span></div>"
+    ).join("");
+
+    const tagsHtml = tags.length
+      ? '<div class="preview-tags">' +
+        visibleTags.map((tag) => '<span class="preview-tag">' + esc(tag) + "</span>").join("") +
+        (more > 0 ? '<span class="preview-tag">+' + more + "</span>" : "") +
+        "</div>"
+      : "";
+
+    const cover = data.cover
+      ? '<img src="' + esc(data.cover) + '" alt="" loading="lazy" ' +
+        'onerror="this.style.display=\'none\'">'
+      : "";
+
+    previewState.textContent = multiple ? "已解析 · 第 1 个链接" : "已解析";
+    previewBody.innerHTML =
+      '<div class="preview-cover"><div class="cover-fallback">暂无封面</div>' +
+      cover + "</div>" +
+      '<div class="preview-title">' +
+      esc(data.title || data.url || "未命名作品") + "</div>" +
+      (metaHtml ? '<div class="preview-meta">' + metaHtml + "</div>" : "") +
+      tagsHtml +
+      '<div class="preview-actions">' +
+      '<a href="' + esc(data.page_url) + '" target="_blank" rel="noopener">打开原页</a>' +
+      '<button class="preview-download" data-url="' + esc(data.page_url) +
+      '">下载此作品</button></div>' +
+      '<div class="preview-note">编号 wnacg' + esc(data.aid) + " · 预览来自详情页</div>";
+  }
+
+  async function loadPreview(force) {
+    const lines = $("urls").value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const url = lines[0] || "";
+    if (!url) {
+      previewCurrent = "";
+      previewSeq += 1;
+      previewEmpty();
+      return;
+    }
+    if (!force && url === previewCurrent) return;
+    previewCurrent = url;
+    const seq = ++previewSeq;
+    const multiple = lines.length > 1;
+    previewState.textContent = "加载中…";
+    previewBody.innerHTML =
+      '<div class="preview-loading"><span class="spinner"></span>正在获取作品详情…</div>';
+    try {
+      const data = await api("/api/preview?url=" + encodeURIComponent(url));
+      if (seq !== previewSeq) return;
+      renderPreview(data.preview || {}, multiple);
+    } catch (error) {
+      if (seq !== previewSeq) return;
+      previewState.textContent = "无法预览";
+      previewBody.innerHTML =
+        '<div class="preview-error">' + esc(error.message || "获取详情失败") + "</div>";
+    }
+  }
+
+  window.toggleLog = function (id, open) {
+    if (open) expanded.add(id);
+    else expanded.delete(id);
+  };
+
+  function jobCard(job) {
+    const status = job.status || "queued";
+    const phase = job.phase || "queued";
+    const percent = Math.max(0, Math.min(100, Number(job.percent) || 0));
+    const running = status === "running";
+    const indeterminate = running && percent <= 0 && phase !== "downloading" && phase !== "pdf";
+
+    let meta = "";
+    if (phase === "downloading") {
+      meta = fmtBytes(job.downloaded) + " / " + fmtBytes(job.total);
+    } else if (phase === "pdf") {
+      meta = (job.pdf_page || 0) + " / " + (job.pdf_total || 0) + " 页";
+    } else if (status === "queued") {
+      meta = "等待队列";
+    } else if (status === "error") {
+      meta = "处理失败";
+    } else if (status === "cancelled") {
+      meta = "任务已取消";
+    } else if (status === "skipped") {
+      meta = "文件已存在，无需重复处理";
+    } else if (status === "done") {
+      meta = "ZIP" + (job.make_pdf ? " + PDF" : "") + " 已就绪";
+    }
+
+    const actions = [];
+    if (status === "error" || status === "cancelled") {
+      actions.push(
+        '<button class="retry-btn" data-id="' + esc(job.id) + '">重试</button>'
+      );
+    }
+    if (status === "queued" || status === "running") {
+      actions.push(
+        job.cancel_requested
+          ? '<button class="cancel-btn" disabled>取消中…</button>'
+          : '<button class="cancel-btn" data-id="' + esc(job.id) + '">取消</button>'
+      );
+    }
+    if (job.files && job.files.zip) {
+      actions.push(
+        '<a href="' + esc(job.files.zip.url) + '">下载 ZIP</a>'
+      );
+    }
+    if (job.files && job.files.pdf) {
+      actions.push(
+        '<a target="_blank" rel="noopener" href="' +
+        esc(job.files.pdf.url) + '&amp;inline=1">打开 PDF</a>'
+      );
+      actions.push(
+        '<a href="' + esc(job.files.pdf.url) + '">下载 PDF</a>'
+      );
+    }
+
+    const logs = Array.isArray(job.logs) ? job.logs : [];
+    const logsHtml = logs.length
+      ? '<details class="logs"' + (expanded.has(job.id) ? " open" : "") +
+        ' ontoggle="toggleLog(\'' + esc(job.id) + '\', this.open)">' +
+        "<summary>日志（" + logs.length + "）</summary><pre>" +
+        esc(logs.join("\n")) + "</pre></details>"
+      : "";
+
+    const errorHtml = job.error
+      ? '<div class="error-box">' + esc(job.error) + "</div>"
+      : "";
+
+    const barClass = [
+      "bar",
+      status === "done" ? "done" : "",
+      status === "skipped" ? "done" : "",
+      status === "error" ? "error" : "",
+      status === "cancelled" ? "cancelled" : "",
+      indeterminate ? "indeterminate" : "",
+    ].filter(Boolean).join(" ");
+
+    const barStyle = (status === "error" || status === "cancelled")
+      ? ' style="width:100%"'
+      : indeterminate ? "" : ' style="width:' + percent.toFixed(1) + '%"';
+    const pctText = (status === "error" || status === "cancelled")
+      ? "—"
+      : percent.toFixed(1) + "%";
+
+    return (
+      '<article class="job ' + esc(status) + '">' +
+        '<div class="job-top">' +
+          "<div>" +
+            '<div class="job-title">' +
+              (running ? '<span class="spinner"></span>' : "") +
+              esc(job.title || job.url) +
+            "</div>" +
+            (job.filename
+              ? '<div class="job-filename">' + esc(job.filename) + "</div>"
+              : "") +
+          "</div>" +
+          '<span class="badge ' + esc(status) + '">' +
+            esc(STATUS_TEXT[status] || status) +
+          "</span>" +
+        "</div>" +
+        '<div class="progress"><div class="' + barClass + '"' + barStyle + "></div></div>" +
+        '<div class="job-meta">' +
+          '<span class="pct">' + pctText + "</span>" +
+          '<span class="phase">' + esc(PHASE_TEXT[phase] || phase) + "</span>" +
+          "<span>" + esc(meta) + "</span>" +
+        "</div>" +
+        errorHtml +
+        (actions.length ? '<div class="job-actions">' + actions.join("") + "</div>" : "") +
+        logsHtml +
+      "</article>"
+    );
+  }
+
+  function render(jobs) {
+    const models = Array.isArray(jobs) ? jobs : [];
+    const active = models.filter((job) => job.status === "queued" || job.status === "running").length;
+    $("summary").textContent = models.length
+      ? "共 " + models.length + " 个 · 进行中 " + active
+      : "";
+
+    if (!models.length) {
+      jobsEl.innerHTML =
+        '<div class="empty"><div class="icon">▤</div><h3>还没有任务</h3>' +
+        "<p>在上面粘贴作品链接，点击“开始下载”。</p></div>";
+      return;
+    }
+    jobsEl.innerHTML = models.map(jobCard).join("");
+  }
+
+  async function refresh() {
+    try {
+      const data = await api("/api/status");
+      $("version").textContent = "v" + (data.version || "1.5.0");
+      $("outputDir").textContent = data.output_dir || "—";
+      $("outputDir").title = data.output_dir || "";
+      const networkText = data.direct ? "直连（DoH）" : (data.proxy || "直连");
+      $("proxy").textContent = networkText;
+      $("proxy").title = networkText;
+      render(data.jobs);
+      pollFailures = 0;
+      $("conn").classList.remove("show");
+    } catch (error) {
+      pollFailures += 1;
+      if (pollFailures >= 2) $("conn").classList.add("show");
+    }
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(refresh, pollFailures ? 1600 : 600);
+  }
+
+  async function submit() {
+    if (submitting) return;
+    const urls = $("urls").value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (!urls.length) {
+      showFormError("请先粘贴至少一个作品链接");
+      return;
+    }
+    showFormError("");
+    submitting = true;
+    const button = $("submit");
+    button.disabled = true;
+    button.textContent = "提交中…";
+    try {
+      const data = await api("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urls: urls,
+          pdf: $("pdf").checked,
+          dpi: Number($("dpi").value),
+          quality: Number($("quality").value),
+          overwrite: $("overwrite").checked,
+        }),
+      });
+      $("urls").value = "";
+      showToast("已加入 " + data.jobs.length + " 个任务");
+      await refresh();
+    } catch (error) {
+      showFormError(error.message || "提交失败");
+    } finally {
+      submitting = false;
+      button.disabled = false;
+      button.textContent = "开始下载";
+    }
+  }
+
+  $("submit").addEventListener("click", submit);
+  $("urls").addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    }
+  });
+
+  $("openFolder").addEventListener("click", async () => {
+    try {
+      await api("/api/open-folder", { method: "POST" });
+    } catch (error) {
+      showToast(error.message || "无法打开文件夹");
+    }
+  });
+
+  $("clearDone").addEventListener("click", async () => {
+    if (!confirm("清空已结束的任务卡片？已下载的文件不会被删除。")) return;
+    try {
+      const data = await api("/api/clear", { method: "POST" });
+      showToast("已清理 " + data.removed + " 个任务卡片");
+      await refresh();
+    } catch (error) {
+      showToast(error.message || "清理失败");
+    }
+  });
+
+  jobsEl.addEventListener("click", async (event) => {
+    const button = event.target.closest ? event.target.closest(".cancel-btn") : null;
+    if (!button || button.disabled || !button.dataset.id) return;
+    button.disabled = true;
+    button.textContent = "取消中…";
+    try {
+      await api("/api/jobs/" + button.dataset.id + "/cancel", { method: "POST" });
+      showToast("已请求取消");
+    } catch (error) {
+      showToast(error.message || "取消失败");
+      button.disabled = false;
+      button.textContent = "取消";
+    }
+  });
+
+  jobsEl.addEventListener("click", async (event) => {
+    const button = event.target.closest ? event.target.closest(".retry-btn") : null;
+    if (!button || button.disabled || !button.dataset.id) return;
+    button.disabled = true;
+    button.textContent = "重试中…";
+    try {
+      await api("/api/jobs/" + button.dataset.id + "/retry", { method: "POST" });
+      showToast("已重新加入队列");
+      await refresh();
+    } catch (error) {
+      showToast(error.message || "重试失败");
+      button.disabled = false;
+      button.textContent = "重试";
+    }
+  });
+
+  $("urls").addEventListener("input", () => {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => loadPreview(), 600);
+  });
+
+  previewBody.addEventListener("click", async (event) => {
+    const button = event.target.closest ? event.target.closest(".preview-download") : null;
+    if (!button || !button.dataset.url) return;
+    $("urls").value = button.dataset.url;
+    await submit();
+  });
+
+  refresh();
+  loadPreview();
+})();
+</script>
+</body>
+</html>
