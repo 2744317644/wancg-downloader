@@ -57,6 +57,25 @@ targets:
         ENABLE_BITCODE: NO
         SUPPORTS_MACCATALYST: NO
 
+  WnacgProxyCheck:
+    type: tool
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Sources/LocalProxy.swift
+      - path: Sources/DoHResolver.swift
+      - path: Sources/WnacgClient.swift
+      - path: Sources/HTMLParser.swift
+      - path: Sources/Models.swift
+      - path: TestMain.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wancg.proxycheck
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        ENABLE_BITCODE: NO
+
 schemes:
   WnacgDownloader:
     build:
@@ -66,3 +85,9 @@ schemes:
       config: Debug
     archive:
       config: Release
+  WnacgProxyCheck:
+    build:
+      targets:
+        WnacgProxyCheck: all
+    run:
+      config: Debug

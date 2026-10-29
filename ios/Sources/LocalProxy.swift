@@ -17,6 +17,9 @@ final class LocalProxy {
 
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
+        parameters.requiredLocalEndpoint = .hostPort(
+            host: "127.0.0.1", port: .any
+        )
         let listener = try NWListener(using: parameters, on: .any)
         self.listener = listener
 

@@ -40,6 +40,25 @@ jobs:
             DEVELOPMENT_TEAM="" \
             | tee build.log
 
+      - name: Proxy and parser smoke test
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project WnacgDownloader.xcodeproj \
+            -scheme WnacgProxyCheck \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build-mac \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            | tee proxy-build.log
+          BIN="$(find build-mac/Build/Products/Debug -type f -name WnacgProxyCheck | head -1)"
+          echo "proxy binary: $BIN"
+          "$BIN"
+
       - name: Package unsigned IPA
         working-directory: ios
         run: |
