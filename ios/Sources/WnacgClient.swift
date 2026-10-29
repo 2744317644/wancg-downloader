@@ -52,15 +52,37 @@ final class WnacgClient {
         let target = try await resolveTarget(rawInput)
         let html = try await fetchHTML(target.galleryURL)
 
-        let title = HTMLParser.first(
+        let desktopTitle = HTMLParser.first(
             "<div id=\"bodywrap\" class=\"userwrap\">\\s*<h2>(.*?)</h2>", in: html
-        ).map(HTMLParser.clean) ?? "未命名作品"
+        )
+        let mobileTitle = HTMLParser.first(
+            "id=\"comicName\"[^>]*>(.*?)</div>", in: html
+        )
+        let titleTag = HTMLParser.first("<title[^>]*>(.*?)</title>", in: html)
+        var title = [mobileTitle, desktopTitle].compactMap { $0 }
+            .map(HTMLParser.clean)
+            .first { !$0.isEmpty }
+        if title == nil, let titleTag {
+            var value = HTMLParser.clean(titleTag)
+            value = value.replacingOccurrences(
+                of: "\\s*[-–—|]\\s*紳士漫畫.*$",
+                with: "",
+                options: .regularExpression
+            )
+            title = value
+        }
+        let displayTitle = title ?? "未命名作品"
 
         let thumb = HTMLParser.first(
             "<div class=\"asTBcell uwthumb\">(.*?)</div>", in: html
         )
-        let coverRaw = thumb.flatMap {
+        var coverRaw = thumb.flatMap {
             HTMLParser.first("<img[^>]+src=\"([^\"]+)\"", in: $0)
+        }
+        if coverRaw == nil {
+            coverRaw = HTMLParser.first(
+                "id=\"Cover\"[^>]*>\\s*<img[^>]+src=\"([^\"]+)\"", in: html
+            )
         }
         let coverURL = coverRaw.flatMap { raw -> URL? in
             let normalized = HTMLParser.normalizeURL(raw)
@@ -83,13 +105,47 @@ final class WnacgClient {
             }
         }
 
-        let tags = HTMLParser.all(
-            "<a class=\"tagshow\"[^>]*>(.*?)</a>", in: html
-        ).map(HTMLParser.clean).filter { !$0.isEmpty }
+        if category.isEmpty {
+            category = HTMLParser.first(
+                "class=\"pd\"[^>]*href=\"/albums-index-cate-\\d+\\.html\"[^>]*>(.*?)</a>",
+                in: html
+            ).map(HTMLParser.clean) ?? ""
+        }
 
-        let uploader = HTMLParser.first(
+        let dateText = HTMLParser.first(
+            "<span class=\"date\">(.*?)</span>", in: html
+        ).map(HTMLParser.clean) ?? ""
+        if pages == nil {
+            pages = HTMLParser.first("(\\d+)\\s*P", in: dateText).flatMap(Int.init)
+        }
+        if favorites == nil {
+            favorites = HTMLParser.first("收藏\\s*(\\d+)", in: dateText)
+                .flatMap(Int.init)
+        }
+        if pages == nil {
+            pages = HTMLParser.first("(\\d+)\\s*P\\s*·", in: html).flatMap(Int.init)
+        }
+
+        var tags = HTMLParser.all(
+            "<a class=\"tagshow\"[^>]*>(.*?)</a>", in: html
+        ).map(HTMLParser.clean)
+        tags += HTMLParser.all(
+            "<a class=\"dv-tag\"[^>]*>(.*?)</a>", in: html
+        ).map(HTMLParser.clean)
+        tags = tags.filter { !$0.isEmpty }
+        var uniqueTags: [String] = []
+        for tag in tags where !uniqueTags.contains(tag) {
+            uniqueTags.append(tag)
+        }
+
+        var uploader = HTMLParser.first(
             "<a href=\"/albums-user-uid-\\d+\\.html\">.*?<p>(.*?)</p>", in: html
         ).map(HTMLParser.clean) ?? ""
+        if uploader.isEmpty {
+            uploader = HTMLParser.first(
+                "class=\"pd introName\"[^>]*>(.*?)</a>", in: html
+            ).map(HTMLParser.clean) ?? ""
+        }
 
         let uploaded = HTMLParser.first(
             "上傳於\\s*(\\d{4}-\\d{2}-\\d{2})", in: html
@@ -97,13 +153,13 @@ final class WnacgClient {
 
         return MangaPreview(
             aid: target.aid,
-            title: title,
+            title: displayTitle,
             category: category,
             pages: pages,
             favorites: favorites,
             uploader: uploader,
             uploaded: uploaded,
-            tags: tags,
+            tags: uniqueTags,
             coverURL: coverURL,
             pageURL: target.galleryURL
         )
