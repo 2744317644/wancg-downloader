@@ -176,7 +176,8 @@ final class WnacgClient {
             uploaded: uploaded,
             tags: uniqueTags,
             coverURL: coverURL,
-            pageURL: target.galleryURL
+            pageURL: target.galleryURL,
+            recommendations: HomeParser.parseRecommendations(html)
         )
     }
 

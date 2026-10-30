@@ -12,6 +12,7 @@ struct MangaPreview: Identifiable {
     let tags: [String]
     let coverURL: URL?
     let pageURL: URL
+    let recommendations: [HomeAlbum]
 }
 
 struct DownloadInfo {

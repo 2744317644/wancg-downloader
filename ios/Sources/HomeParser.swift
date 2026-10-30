@@ -117,6 +117,57 @@ enum HomeParser {
         return albums
     }
 
+    static func parseRecommendations(_ html: String) -> [HomeAlbum] {
+        let cards = HTMLParser.matches(
+            "<a class=\"dv-rec-item\"[^>]*href=\"[^\"]+\"[^>]*>.*?</a>",
+            in: html
+        )
+        var albums: [HomeAlbum] = []
+        var seen = Set<String>()
+
+        for card in cards {
+            guard let href = HTMLParser.first(
+                "href=\"([^\"]+)\"", in: card
+            ), let aid = HTMLParser.first(
+                "photos-index-aid-(\\d+)", in: href
+            ), !seen.contains(aid) else {
+                continue
+            }
+
+            let title = HTMLParser.first(
+                "<p class=\"dv-rec-title\"[^>]*>(.*?)</p>", in: card
+            ).map(HTMLParser.clean) ?? ""
+            if title.isEmpty { continue }
+
+            let coverRaw = HTMLParser.first(
+                "<img[^>]+src=\"([^\"]+)\"", in: card
+            )
+            let coverURL = coverRaw.flatMap { raw -> URL? in
+                URL(string: HTMLParser.encodedURLString(
+                    HTMLParser.normalizeURL(raw)
+                ))
+            }
+            let favorite = HTMLParser.first(
+                "<span class=\"dv-rec-fav\"[^>]*>(.*?)</span>", in: card
+            ).map(HTMLParser.clean) ?? ""
+
+            albums.append(HomeAlbum(
+                aid: aid,
+                title: title,
+                coverURL: coverURL,
+                info: favorite,
+                pages: nil,
+                date: "",
+                pageURL: URL(
+                    string: "https://www.wnacg.com/photos-index-aid-\(aid).html"
+                )!
+            ))
+            seen.insert(aid)
+            if albums.count >= 12 { break }
+        }
+        return albums
+    }
+
     static func nextPageURL(_ html: String, current: URL) -> URL? {
         if let href = HTMLParser.first(
             "<span class=\"next\"><a href=\"([^\"]+)\"", in: html

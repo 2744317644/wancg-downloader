@@ -34,6 +34,20 @@ enum HTMLParser {
         all(pattern, in: text)
     }
 
+    static func matches(_ pattern: String, in text: String) -> [String] {
+        guard let regex = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        ) else { return [] }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range).compactMap { match in
+            guard let valueRange = Range(match.range, in: text) else {
+                return nil
+            }
+            return String(text[valueRange])
+        }
+    }
+
     static func clean(_ value: String) -> String {
         var text = value.replacingOccurrences(
             of: "<[^>]+>", with: " ", options: .regularExpression

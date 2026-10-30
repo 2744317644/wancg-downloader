@@ -64,6 +64,7 @@ struct AlbumDetailView: View {
                 actionButtons
                 if !tags.isEmpty { tagGrid }
                 downloadStatus
+                recommendationsSection
                 if let error = model.error, !model.isLoading {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("详情加载失败")
@@ -296,7 +297,8 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var downloadStatus: some View {
-        if downloadModel.isBusy || downloadModel.zipURL != nil
+        if downloadModel.input == album.pageURL.absoluteString,
+           downloadModel.isBusy || downloadModel.zipURL != nil
             || downloadModel.pdfURL != nil || downloadModel.errorMessage != nil {
             VStack(alignment: .leading, spacing: 8) {
                 if downloadModel.isBusy {
@@ -333,6 +335,41 @@ struct AlbumDetailView: View {
             .background(Color.primary.opacity(0.04), in: RoundedRectangle(
                 cornerRadius: 12, style: .continuous
             ))
+        }
+    }
+
+    @ViewBuilder
+    private var recommendationsSection: some View {
+        let items = (model.preview?.recommendations ?? [])
+            .filter { .aid != album.aid }
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("看过这本的人也看了")
+                    .font(.headline)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(items) { item in
+                            NavigationLink {
+                                AlbumDetailView(album: item)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HomeCover(album: item)
+                                        .frame(width: 112, height: 149)
+                                    Text(item.title)
+                                        .font(.caption2)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+                                        .frame(width: 112, alignment: .leading)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .padding(.top, 4)
         }
     }
 
