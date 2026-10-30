@@ -49,6 +49,8 @@
 - **文件**：浏览 App Documents 里的 ZIP / PDF，点击 PDF 直接预览（PDFKit），支持分享和删除；
 - 底部 **Liquid Glass 页签**：使用 iOS 26 SDK 的系统 `TabView`，自动获得液态玻璃外观，
   并启用 `tabBarMinimizeBehavior(.onScrollDown)` 滚动收起；
+- **外观**：首页左上角可切换“跟随系统 / 浅色 / 深色”，浅色模式会同步调整首页、分类、
+  详情和下载页的背景与文字；
 - 旧系统（iOS 17–25）使用标准系统页签，不会崩溃。
 
 ### 实现说明
