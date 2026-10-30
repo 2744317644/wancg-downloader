@@ -30,6 +30,10 @@ enum HTMLParser {
         }
     }
 
+    static func blocks(_ pattern: String, in text: String) -> [String] {
+        all(pattern, in: text)
+    }
+
     static func clean(_ value: String) -> String {
         var text = value.replacingOccurrences(
             of: "<[^>]+>", with: " ", options: .regularExpression

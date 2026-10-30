@@ -1,177 +1,381 @@
-import Network
 import SwiftUI
-import WebKit
+import UIKit
+
+struct HomeAlbum: Identifiable {
+    let id = UUID()
+    let aid: String
+    let title: String
+    let coverURL: URL?
+    let info: String
+    let pages: Int?
+    let date: String
+    let pageURL: URL
+}
+
+struct HomeSection: Identifiable {
+    let id = UUID()
+    let title: String
+    let albums: [HomeAlbum]
+}
+
+enum HomeParser {
+    static func parse(_ html: String) -> [HomeSection] {
+        let blocks = HTMLParser.blocks(
+            "<div class=\"imgBox\">(.*?)(?=<div class=\"(?:imgBox|sh)\">|</body>)",
+            in: html
+        )
+        var sections: [HomeSection] = []
+
+        for block in blocks {
+            guard let title = HTMLParser.first(
+                "<span class=\"Title\">(.*?)</span>", in: block
+            ).map(HTMLParser.clean), !title.isEmpty else {
+                continue
+            }
+
+            var albums: [HomeAlbum] = []
+            var seen = Set<String>()
+            for card in HTMLParser.blocks("<li>(.*?)</li>", in: block) {
+                guard let href = HTMLParser.first(
+                    "href=\"(/photos-index-aid-(\\d+)\\.html)\"", in: card
+                ), let aid = HTMLParser.first(
+                    "photos-index-aid-(\\d+)\\.html", in: href
+                ) else {
+                    continue
+                }
+                guard !seen.contains(aid) else { continue }
+
+                let title = HTMLParser.first(
+                    "<a class=\"txtA\"[^>]*>(.*?)</a>", in: card
+                ).map(HTMLParser.clean) ?? ""
+                if title.isEmpty { continue }
+
+                let info = HTMLParser.first(
+                    "<span class=\"info\">(.*?)</span>", in: card
+                ).map(HTMLParser.clean) ?? ""
+
+                let coverRaw = HTMLParser.first(
+                    "<img[^>]+src=\"([^\"]+)\"", in: card
+                )
+                let coverURL = coverRaw.flatMap { raw -> URL? in
+                    URL(string: HTMLParser.encodedURLString(
+                        HTMLParser.normalizeURL(raw)
+                    ))
+                }
+
+                let pages = HTMLParser.first("(\\d+)\\s*[張张]", in: info)
+                    .flatMap(Int.init)
+                let date = HTMLParser.first(
+                    "(\\d{4}-\\d{2}-\\d{2})", in: info
+                ) ?? ""
+
+                let pageURL = URL(
+                    string: "https://www.wnacg.com/photos-index-aid-\(aid).html"
+                )!
+                albums.append(HomeAlbum(
+                    aid: aid,
+                    title: title,
+                    coverURL: coverURL,
+                    info: info,
+                    pages: pages,
+                    date: date,
+                    pageURL: pageURL
+                ))
+                seen.insert(aid)
+            }
+
+            if !albums.isEmpty {
+                sections.append(HomeSection(title: title, albums: albums))
+            }
+        }
+        return sections
+    }
+}
 
 @MainActor
-final class BrowserState: ObservableObject {
-    @Published var title = "绅士漫画"
-    @Published var isLoading = true
-    @Published var canGoBack = false
-    @Published var canGoForward = false
+final class HomeFeedModel: ObservableObject {
+    @Published var sections: [HomeSection] = []
+    @Published var isLoading = false
     @Published var error: String?
-    weak var webView: WKWebView?
+
+    private var client: WnacgClient?
+    private var loaded = false
+
+    func load(force: Bool = false) async {
+        if isLoading || (loaded && !force) { return }
+        isLoading = true
+        error = nil
+        do {
+            let client = try WnacgClient()
+            self.client = client
+            let html = try await client.fetchHTML(
+                URL(string: "https://www.wnacg.com/")!
+            )
+            sections = HomeParser.parse(html)
+            loaded = true
+            if sections.isEmpty {
+                error = "首页没有解析到作品，可能站点结构变了"
+            }
+        } catch {
+            error = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+@MainActor
+final class CoverImageStore {
+    static let shared = CoverImageStore()
+
+    private let cache = NSCache<NSURL, UIImage>()
+    private var client: WnacgClient?
+
+    private init() {
+        cache.countLimit = 120
+    }
+
+    func image(for url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+        do {
+            if client == nil {
+                client = try WnacgClient()
+            }
+            guard let client else { return nil }
+            let data = try await client.imageData(url, referer: referer)
+            guard let image = UIImage(data: data) else { return nil }
+            cache.setObject(image, forKey: url as NSURL)
+            return image
+        } catch {
+            return nil
+        }
+    }
 }
 
 struct HomeView: View {
-    @StateObject private var browser = BrowserState()
-    private let homeURL = URL(string: "https://www.wnacg.com/")!
+    let onSelect: (HomeAlbum) -> Void
+
+    @StateObject private var model = HomeFeedModel()
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 10),
+        count: 3
+    )
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                SiteWebView(browser: browser, url: homeURL)
-                    .ignoresSafeArea(edges: .bottom)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 22) {
+                    hero
 
-                if browser.isLoading {
-                    ProgressView()
-                        .progressViewStyle(.linear)
-                        .tint(.mint)
+                    if model.sections.isEmpty && model.isLoading {
+                        loadingView
+                    } else if let error = model.error, model.sections.isEmpty {
+                        errorView(error)
+                    } else {
+                        ForEach(model.sections) { section in
+                            sectionView(section)
+                        }
+                        footer
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 28)
             }
-            .navigationTitle(browser.title)
-            .navigationBarTitleDisplayMode(.inline)
+            .background(background)
+            .navigationTitle("发现")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        browser.webView?.goBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                    }
-                    .disabled(!browser.canGoBack)
-
-                    Button {
-                        browser.webView?.goForward()
-                    } label: {
-                        Image(systemName: "chevron.right")
-                    }
-                    .disabled(!browser.canGoForward)
-                }
-
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        browser.webView?.reload()
+                        Task { await model.load(force: true) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-
-                    Button {
-                        browser.webView?.load(URLRequest(url: homeURL))
-                    } label: {
-                        Image(systemName: "house")
-                    }
+                    .disabled(model.isLoading)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if let error = browser.error {
-                    Text(error)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 20)
+            .refreshable {
+                await model.load(force: true)
+            }
+            .task {
+                await model.load()
+            }
+        }
+    }
+
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [.mint, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Image(systemName: "book.pages.fill")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.black.opacity(0.75))
+            }
+            .frame(width: 48, height: 48)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("绅士漫画")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("最新上架 · 同人志 · 单行本")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.top, 4)
+    }
+
+    private func sectionView(_ section: HomeSection) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [.mint, .blue],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: 15)
+                Text(section.title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("\(section.albums.count) 部")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(section.albums) { album in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onSelect(album)
+                    } label: {
+                        albumCard(album)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func albumCard(_ album: HomeAlbum) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HomeCover(album: album)
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+
+            Text(album.title)
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.leading)
+
+            HStack(spacing: 4) {
+                if let pages = album.pages {
+                    Text("\(pages)P")
+                }
+                if !album.date.isEmpty {
+                    Text(album.date)
+                }
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+            Text("正在加载首页…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.largeTitle)
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("重试") {
+                Task { await model.load(force: true) }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.mint)
+            .foregroundStyle(.black)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 50)
+    }
+
+    private var footer: some View {
+        Text("内容来自绅士漫画 · 仅供个人备份")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 6)
+    }
+
+    private var background: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.04, green: 0.06, blue: 0.10),
+                Color(red: 0.02, green: 0.03, blue: 0.06),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
     }
 }
 
-private struct SiteWebView: UIViewRepresentable {
-    @ObservedObject var browser: BrowserState
-    let url: URL
+private struct HomeCover: View {
+    let album: HomeAlbum
+    @State private var image: UIImage?
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(browser: browser)
-    }
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.045))
 
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        let store = WKWebsiteDataStore.default()
-
-        if #available(iOS 17.0, *) {
-            let port = LocalProxy.shared.port
-            if port > 0, let nwPort = NWEndpoint.Port(rawValue: port) {
-                var proxy = ProxyConfiguration(
-                    httpCONNECTProxy: .hostPort(
-                        host: "127.0.0.1", port: nwPort
-                    )
-                )
-                proxy.excludedDomains = ["localhost", "127.0.0.1"]
-                store.proxyConfigurations = [proxy]
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
             } else {
-                browser.error = "本地代理未启动，网页可能无法加载"
+                Image(systemName: "photo")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.18))
             }
         }
-        configuration.websiteDataStore = store
-
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.navigationDelegate = context.coordinator
-        webView.uiDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true
-        webView.isOpaque = false
-        webView.backgroundColor = UIColor(red: 0.04, green: 0.06, blue: 0.10, alpha: 1)
-        webView.scrollView.backgroundColor = webView.backgroundColor
-        webView.load(URLRequest(url: url))
-        browser.webView = webView
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {}
-
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        let browser: BrowserState
-
-        init(browser: BrowserState) {
-            self.browser = browser
-        }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            browser.isLoading = true
-            browser.error = nil
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            browser.isLoading = false
-            browser.title = webView.title?.isEmpty == false ? webView.title! : "绅士漫画"
-            updateNavigation(webView)
-        }
-
-        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-            updateNavigation(webView)
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            browser.isLoading = false
-            browser.error = error.localizedDescription
-        }
-
-        func webView(
-            _ webView: WKWebView,
-            didFailProvisionalNavigation navigation: WKNavigation!,
-            withError error: Error
-        ) {
-            browser.isLoading = false
-            browser.error = error.localizedDescription
-        }
-
-        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            webView.reload()
-        }
-
-        func webView(
-            _ webView: WKWebView,
-            createWebViewWith configuration: WKWebViewConfiguration,
-            for navigationAction: WKNavigationAction,
-            windowFeatures: WKWindowFeatures
-        ) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
-            return nil
-        }
-
-        private func updateNavigation(_ webView: WKWebView) {
-            browser.canGoBack = webView.canGoBack
-            browser.canGoForward = webView.canGoForward
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+        )
+        .task(id: album.coverURL) {
+            guard let coverURL = album.coverURL else { return }
+            image = await CoverImageStore.shared.image(
+                for: coverURL, referer: album.pageURL
+            )
         }
     }
 }

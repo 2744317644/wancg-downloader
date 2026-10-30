@@ -37,7 +37,8 @@
 
 ### App 功能
 
-- **首页**：内置 WKWebView 直接浏览 wnacg 首页，使用本地 DoH CONNECT 代理加载网页和图片；
+- **首页**：原生 SwiftUI 渲染，不再套 WebView。抓取首页 HTML 后解析“最新上架 / 同人志 /
+  單行本 / 雜誌·短篇”四个栏目，用三列封面卡片展示；点卡片自动切到“下载”页并开始解析；
 - **下载**：粘贴链接，解析封面、标题、页数、标签；下载 ZIP、解压、生成 300 DPI PDF；
 - **文件**：浏览 App Documents 里的 ZIP / PDF，点击 PDF 直接预览（PDFKit），支持分享和删除；
 - 底部 **Liquid Glass 页签**：使用 iOS 26 SDK 的系统 `TabView`，自动获得液态玻璃外观，
@@ -48,8 +49,8 @@
 
 - `LocalProxy`：在 App 内启动 `127.0.0.1` 的 HTTP CONNECT 代理；
 - `DoHResolver`：通过 `doh.pub` 解析真实 IP，内置实测备用 IP；
-- `URLSession` 与 WKWebView 都走这个本地代理（WKWebView 用
-  `WKWebsiteDataStore.proxyConfigurations`），TLS SNI 仍然是原域名，证书正常校验；
+- `URLSession` 走这个本地代理，TLS SNI 仍然是原域名，证书正常校验；
+- 首页封面也通过同一个代理加载并缓存在 `NSCache`，不经过 WebView；
 - `ZIPFoundation` 解压，`UIGraphicsPDFRenderer` 生成 PDF，`PDFKit` 预览。
 
 ### CI 已验证

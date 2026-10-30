@@ -10,6 +10,7 @@ __pycache__/
 push_github.py
 push_all.py
 push_icons.py
+push_home.py
 preview_sample.html
 ios/build/
 ios/build.log

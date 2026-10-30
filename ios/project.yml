@@ -20,7 +20,6 @@ targets:
       - path: Resources
     dependencies:
       - package: ZIPFoundation
-      - sdk: WebKit.framework
       - sdk: PDFKit.framework
     info:
       path: Info.plist

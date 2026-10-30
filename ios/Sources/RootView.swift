@@ -1,15 +1,20 @@
 import SwiftUI
 
 struct RootView: View {
+    @StateObject private var downloadModel = AppModel()
     @State private var selection = 0
 
     var body: some View {
         let tabs = TabView(selection: $selection) {
-            HomeView()
-                .tabItem { Label("首页", systemImage: "house.fill") }
-                .tag(0)
+            HomeView { album in
+                downloadModel.input = album.pageURL.absoluteString
+                selection = 1
+                Task { await downloadModel.parse() }
+            }
+            .tabItem { Label("首页", systemImage: "house.fill") }
+            .tag(0)
 
-            ContentView()
+            ContentView(model: downloadModel)
                 .tabItem { Label("下载", systemImage: "arrow.down.circle.fill") }
                 .tag(1)
 
