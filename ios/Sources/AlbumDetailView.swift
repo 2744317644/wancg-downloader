@@ -41,6 +41,7 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var history: HistoryStore
     @State private var showAlreadyDownloaded = false
     @State private var didCopyTitle = false
+    @State private var downloadStartedHere = false
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model: AlbumDetailModel
 
@@ -297,7 +298,8 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var downloadStatus: some View {
-        if downloadModel.input == album.pageURL.absoluteString
+        if downloadStartedHere
+            && downloadModel.input == album.pageURL.absoluteString
             && (downloadModel.isBusy || downloadModel.zipURL != nil
                 || downloadModel.pdfURL != nil || downloadModel.errorMessage != nil) {
             VStack(alignment: .leading, spacing: 8) {
@@ -384,6 +386,7 @@ struct AlbumDetailView: View {
     }
 
     private func performDownload() {
+        downloadStartedHere = true
         downloadModel.input = album.pageURL.absoluteString
         Task { await downloadModel.parseAndDownload() }
     }
