@@ -18,14 +18,19 @@ struct RootView: View {
                 .tabItem { Label("收藏", systemImage: "heart.fill") }
                 .tag(2)
 
+            HistoryView()
+                .tabItem { Label("历史", systemImage: "clock.arrow.circlepath") }
+                .tag(3)
+
             FilesView()
                 .tabItem { Label("文件", systemImage: "folder.fill") }
-                .tag(3)
+                .tag(4)
         }
         .tint(.mint)
         .environmentObject(downloadModel)
         .environmentObject(FavoritesStore.shared)
         .environmentObject(DownloadHistory.shared)
+        .environmentObject(HistoryStore.shared)
 
         if #available(iOS 26.0, *) {
             // iOS 26 的系统 TabView 会自动使用 Liquid Glass 外观。

@@ -38,6 +38,7 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var downloadModel: AppModel
     @EnvironmentObject private var favorites: FavoritesStore
     @EnvironmentObject private var downloads: DownloadHistory
+    @EnvironmentObject private var history: HistoryStore
     @State private var showAlreadyDownloaded = false
     @State private var didCopyTitle = false
     @Environment(\.colorScheme) private var colorScheme
@@ -110,7 +111,9 @@ struct AlbumDetailView: View {
             }
         }
         .task {
+            history.record(album: album, preview: model.preview)
             await model.load()
+            history.record(album: album, preview: model.preview)
         }
         .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
             Button("取消", role: .cancel) {}
