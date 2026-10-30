@@ -32,6 +32,7 @@ private struct PDFItem: Identifiable {
 struct FilesView: View {
     @State private var files: [DownloadedFile] = []
     @State private var preview: PDFItem?
+    @AppStorage("files.hideZIP") private var hideZIP = false
 
     var body: some View {
         NavigationStack {
@@ -55,12 +56,23 @@ struct FilesView: View {
             .navigationTitle("文件")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Toggle("隐藏 ZIP 文件", isOn: $hideZIP)
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         load()
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
+            }
+            .onChange(of: hideZIP) { _, _ in
+                load()
             }
             .sheet(item: $preview) { item in
                 NavigationStack {
@@ -140,7 +152,11 @@ struct FilesView: View {
             return
         }
         files = urls
-            .filter { ["zip", "pdf"].contains($0.pathExtension.lowercased()) }
+            .filter { url in
+                let ext = url.pathExtension.lowercased()
+                guard ext == "zip" || ext == "pdf" else { return false }
+                return !(hideZIP && ext == "zip")
+            }
             .map(DownloadedFile.init(url:))
             .sorted { $0.date > $1.date }
     }

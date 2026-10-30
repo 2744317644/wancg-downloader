@@ -68,6 +68,11 @@ struct HomeView: View {
     @State private var searchQuery = ""
     @State private var showSearch = false
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
+    @AppStorage("manga.languageFilter")
+    private var languageFilter = MangaLanguageFilter.all.rawValue
+    @AppStorage("manga.hideDownloaded")
+    private var hideDownloaded = false
+    @EnvironmentObject private var downloads: DownloadHistory
     @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
@@ -85,8 +90,12 @@ struct HomeView: View {
                         errorView(error)
                     } else {
                         categoryChips
-                        ForEach(model.sections) { section in
-                            sectionView(section)
+                        if visibleSections.isEmpty {
+                            filterEmptyView
+                        } else {
+                            ForEach(visibleSections) { section in
+                                sectionView(section)
+                            }
                         }
                         footer
                     }
@@ -128,6 +137,10 @@ struct HomeView: View {
                             rawValue: appearance
                         )?.icon ?? "circle.lefthalf.filled")
                     }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    MangaFilterMenu()
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -278,6 +291,47 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 50)
+    }
+
+    private var selectedLanguage: MangaLanguageFilter {
+        MangaLanguageFilter(rawValue: languageFilter) ?? .all
+    }
+
+    private var visibleSections: [HomeSection] {
+        model.sections.compactMap { section in
+            let albums = filtered(section.albums)
+            guard !albums.isEmpty else { return nil }
+            return HomeSection(
+                title: section.title,
+                albums: albums,
+                moreURL: section.moreURL
+            )
+        }
+    }
+
+    private func filtered(_ albums: [HomeAlbum]) -> [HomeAlbum] {
+        albums.filter { album in
+            album.matches(language: selectedLanguage)
+                && (!hideDownloaded || !downloads.isDownloaded(album.aid))
+        }
+    }
+
+    private var filterEmptyView: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("没有符合筛选的作品")
+                .font(.subheadline)
+            Button("清除筛选") {
+                languageFilter = MangaLanguageFilter.all.rawValue
+                hideDownloaded = false
+            }
+            .buttonStyle(.bordered)
+            .tint(.mint)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 44)
     }
 
     private var footer: some View {

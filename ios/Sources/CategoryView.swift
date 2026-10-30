@@ -77,6 +77,11 @@ struct CategoryView: View {
     let title: String
     @StateObject private var model: CategoryFeedModel
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var downloads: DownloadHistory
+    @AppStorage("manga.languageFilter")
+    private var languageFilter = MangaLanguageFilter.all.rawValue
+    @AppStorage("manga.hideDownloaded")
+    private var hideDownloaded = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -91,9 +96,9 @@ struct CategoryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
-                if !model.albums.isEmpty {
+                if !visibleAlbums.isEmpty {
                     HStack {
-                        Text("\(model.albums.count) 部作品")
+                        Text("\(visibleAlbums.count) 部作品")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -106,7 +111,7 @@ struct CategoryView: View {
                 }
 
                 LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(model.albums) { album in
+                    ForEach(visibleAlbums) { album in
                         NavigationLink {
                             AlbumDetailView(album: album)
                         } label: {
@@ -114,7 +119,7 @@ struct CategoryView: View {
                         }
                         .buttonStyle(.plain)
                         .onAppear {
-                            if album.aid == model.albums.last?.aid {
+                            if album.aid == visibleAlbums.last?.aid {
                                 Task { await model.loadMore() }
                             }
                         }
@@ -130,6 +135,10 @@ struct CategoryView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                MangaFilterMenu()
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await model.reload() }
@@ -173,7 +182,32 @@ struct CategoryView: View {
                         description: Text("换个关键词或分类试试")
                     )
                 }
+            } else if visibleAlbums.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text("本页没有符合筛选的作品")
+                        .font(.subheadline)
+                    Button("清除筛选") {
+                        languageFilter = MangaLanguageFilter.all.rawValue
+                        hideDownloaded = false
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.mint)
+                }
             }
+        }
+    }
+
+    private var selectedLanguage: MangaLanguageFilter {
+        MangaLanguageFilter(rawValue: languageFilter) ?? .all
+    }
+
+    private var visibleAlbums: [HomeAlbum] {
+        model.albums.filter { album in
+            album.matches(language: selectedLanguage)
+                && (!hideDownloaded || !downloads.isDownloaded(album.aid))
         }
     }
 
