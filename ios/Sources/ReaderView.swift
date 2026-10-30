@@ -27,7 +27,12 @@ final class ReaderModel: ObservableObject {
             let itemURL = URL(
                 string: "https://www.wnacg.com/photos-item-aid-\(aid).html"
             )!
-            let html = try await client.fetchHTML(itemURL)
+            let galleryURL = URL(
+                string: "https://www.wnacg.com/photos-index-aid-\(aid).html"
+            )!
+            let html = try await client.fetchHTML(
+                itemURL, referer: galleryURL
+            )
             guard let arrayText = HTMLParser.first(
                 "\"page_url\"\\s*:\\s*\\[(.*?)\\]", in: html
             ) else {

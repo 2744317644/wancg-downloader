@@ -51,7 +51,10 @@ final class WnacgClient {
 
     func preview(for rawInput: String) async throws -> MangaPreview {
         let target = try await resolveTarget(rawInput)
-        let html = try await fetchHTML(target.galleryURL)
+        let html = try await fetchHTML(
+            target.galleryURL,
+            referer: URL(string: "https://www.wnacg.com/")
+        )
 
         let desktopTitle = HTMLParser.first(
             "<div id=\"bodywrap\" class=\"userwrap\">\\s*<h2>(.*?)</h2>", in: html
