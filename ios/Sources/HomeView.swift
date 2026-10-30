@@ -281,7 +281,7 @@ struct HomeView: View {
     }
 
     private var footer: some View {
-        Text("内容来自绅士漫画 · 仅供个人备份")
+        Text("仅供个人备份")
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity)

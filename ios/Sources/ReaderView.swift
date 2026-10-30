@@ -67,16 +67,29 @@ final class ReaderImageStore {
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
+        if client == nil {
+            client = try? WnacgClient()
+        }
+        guard let client else { return nil }
+
         do {
-            if client == nil {
-                client = try WnacgClient()
-            }
-            guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
             guard let image = UIImage(data: data) else { return nil }
             cache.setObject(image, forKey: url as NSURL)
             return image
         } catch {
+            // img5 偶发超时，尝试同一路径的 img4 镜像。
+            if var components = URLComponents(
+                url: url, resolvingAgainstBaseURL: false
+            ), components.host == "img5.qy0.ru" {
+                components.host = "img4.qy0.ru"
+                if let mirror = components.url,
+                   let data = try? await client.imageData(mirror, referer: referer),
+                   let image = UIImage(data: data) {
+                    cache.setObject(image, forKey: url as NSURL)
+                    return image
+                }
+            }
             return nil
         }
     }

@@ -22,3 +22,5 @@ ios/*.xcodeproj
 ios/Info.plist
 *.ipa
 .DS_Store
+
+push_gh.py
