@@ -1,5 +1,28 @@
 import SwiftUI
 import UIKit
+import ImageIO
+
+private enum ReaderImageDecoder {
+    static let maxPixelSize: CGFloat = 1600
+
+    static func downsample(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return UIImage(data: data)
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source, 0, options as CFDictionary
+        ) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
+    }
+}
 
 @MainActor
 final class ReaderModel: ObservableObject {
@@ -70,8 +93,8 @@ final class ReaderImageStore {
     private let maxConcurrentPrefetch = 3
 
     private init() {
-        cache.countLimit = 24
-        cache.totalCostLimit = 220 * 1024 * 1024
+        cache.countLimit = 16
+        cache.totalCostLimit = 140 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -85,7 +108,7 @@ final class ReaderImageStore {
 
         do {
             let data = try await client.imageData(url, referer: referer)
-            guard let image = UIImage(data: data) else { return nil }
+            guard let image = await decode(data) else { return nil }
             cacheImage(image, for: url)
             return image
         } catch {
@@ -96,13 +119,19 @@ final class ReaderImageStore {
                 components.host = "img4.qy0.ru"
                 if let mirror = components.url,
                    let data = try? await client.imageData(mirror, referer: referer),
-                   let image = UIImage(data: data) {
+                   let image = await decode(data) {
                     cacheImage(image, for: url)
                     return image
                 }
             }
             return nil
         }
+    }
+
+    private func decode(_ data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            ReaderImageDecoder.downsample(data)
+        }.value
     }
 
     /// 预载当前页下面的图片，默认由页面传入后续 10 页。
