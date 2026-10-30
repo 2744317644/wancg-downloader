@@ -67,6 +67,17 @@ struct ProxyCheck {
                 print("HOME_FAIL=no cards")
                 exit(2)
             }
+
+            let listURL = URL(string: "https://www.wnacg.com/albums.html")!
+            let listHTML = try await client.fetchHTML(listURL)
+            let listAlbums = HomeParser.parseCards(listHTML)
+            let nextPage = HomeParser.nextPageURL(listHTML, current: listURL)
+            print("LIST_CARDS=\(listAlbums.count)")
+            print("LIST_NEXT=\(nextPage?.absoluteString ?? "nil")")
+            if listAlbums.count < 10 || nextPage == nil {
+                print("LIST_FAIL=missing cards or next page")
+                exit(2)
+            }
             exit(0)
         } catch {
             print("ERROR=\(error.localizedDescription)")

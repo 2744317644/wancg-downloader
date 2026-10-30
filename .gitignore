@@ -11,6 +11,7 @@ push_github.py
 push_all.py
 push_icons.py
 push_home.py
+push_cat.py
 preview_sample.html
 ios/build/
 ios/build.log

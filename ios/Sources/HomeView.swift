@@ -83,6 +83,7 @@ struct HomeView: View {
                     } else if let error = model.error, model.sections.isEmpty {
                         errorView(error)
                     } else {
+                        categoryChips
                         ForEach(model.sections) { section in
                             sectionView(section)
                         }
@@ -144,6 +145,51 @@ struct HomeView: View {
         .padding(.top, 4)
     }
 
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                NavigationLink {
+                    CategoryView(
+                        title: "全部作品",
+                        startURL: URL(string: "https://www.wnacg.com/albums.html")!,
+                        onSelect: onSelect
+                    )
+                } label: {
+                    chip("全部")
+                }
+                .buttonStyle(.plain)
+
+                ForEach(model.sections) { section in
+                    if let moreURL = section.moreURL {
+                        NavigationLink {
+                            CategoryView(
+                                title: section.title,
+                                startURL: moreURL,
+                                onSelect: onSelect
+                            )
+                        } label: {
+                            chip(section.title)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func chip(_ title: String) -> some View {
+        Text(title)
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+    }
+
     private func sectionView(_ section: HomeSection) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -160,6 +206,24 @@ struct HomeView: View {
                     .font(.headline)
                     .foregroundStyle(.white)
                 Spacer()
+                if let moreURL = section.moreURL {
+                    NavigationLink {
+                        CategoryView(
+                            title: section.title,
+                            startURL: moreURL,
+                            onSelect: onSelect
+                        )
+                    } label: {
+                        HStack(spacing: 2) {
+                            Text("更多")
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.mint)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Text("\(section.albums.count) 部")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -171,36 +235,11 @@ struct HomeView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         onSelect(album)
                     } label: {
-                        albumCard(album)
+                        AlbumCardView(album: album)
                     }
                     .buttonStyle(.plain)
                 }
             }
-        }
-    }
-
-    private func albumCard(_ album: HomeAlbum) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HomeCover(album: album)
-                .aspectRatio(3.0 / 4.0, contentMode: .fit)
-
-            Text(album.title)
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.92))
-                .lineLimit(2, reservesSpace: true)
-                .multilineTextAlignment(.leading)
-
-            HStack(spacing: 4) {
-                if let pages = album.pages {
-                    Text("\(pages)P")
-                }
-                if !album.date.isEmpty {
-                    Text(album.date)
-                }
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
         }
     }
 
@@ -253,38 +292,5 @@ struct HomeView: View {
             endPoint: .bottom
         )
         .ignoresSafeArea()
-    }
-}
-
-private struct HomeCover: View {
-    let album: HomeAlbum
-    @State private var image: UIImage?
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.045))
-
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "photo")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.18))
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.white.opacity(0.07), lineWidth: 1)
-        )
-        .task(id: album.coverURL) {
-            guard let coverURL = album.coverURL else { return }
-            image = await CoverImageStore.shared.image(
-                for: coverURL, referer: album.pageURL
-            )
-        }
     }
 }
