@@ -59,8 +59,14 @@ final class ReaderImageStore {
     private let cache = NSCache<NSURL, UIImage>()
     private var client: WnacgClient?
 
+    private var prefetching = Set<URL>()
+    private var prefetchQueue: [(url: URL, referer: URL)] = []
+    private var activePrefetch = 0
+    private let maxConcurrentPrefetch = 3
+
     private init() {
-        cache.countLimit = 8
+        cache.countLimit = 24
+        cache.totalCostLimit = 220 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -75,7 +81,7 @@ final class ReaderImageStore {
         do {
             let data = try await client.imageData(url, referer: referer)
             guard let image = UIImage(data: data) else { return nil }
-            cache.setObject(image, forKey: url as NSURL)
+            cacheImage(image, for: url)
             return image
         } catch {
             // img5 偶发超时，尝试同一路径的 img4 镜像。
@@ -86,12 +92,49 @@ final class ReaderImageStore {
                 if let mirror = components.url,
                    let data = try? await client.imageData(mirror, referer: referer),
                    let image = UIImage(data: data) {
-                    cache.setObject(image, forKey: url as NSURL)
+                    cacheImage(image, for: url)
                     return image
                 }
             }
             return nil
         }
+    }
+
+    /// 预载当前页下面的图片，默认由页面传入后续 10 页。
+    func prefetch(_ urls: [URL], referer: URL) {
+        for url in urls {
+            guard cache.object(forKey: url as NSURL) == nil,
+                  !prefetching.contains(url) else {
+                continue
+            }
+            prefetching.insert(url)
+            prefetchQueue.append((url, referer))
+        }
+        startPrefetch()
+    }
+
+    private func startPrefetch() {
+        while activePrefetch < maxConcurrentPrefetch,
+              !prefetchQueue.isEmpty {
+            let item = prefetchQueue.removeFirst()
+            activePrefetch += 1
+            Task { [weak self] in
+                guard let self else { return }
+                _ = await self.image(for: item.url, referer: item.referer)
+                self.finishPrefetch(item.url)
+            }
+        }
+    }
+
+    private func finishPrefetch(_ url: URL) {
+        prefetching.remove(url)
+        activePrefetch = max(0, activePrefetch - 1)
+        startPrefetch()
+    }
+
+    private func cacheImage(_ image: UIImage, for url: URL) {
+        let cost = Int(image.size.width * image.size.height * 4)
+        cache.setObject(image, forKey: url as NSURL, cost: cost)
     }
 }
 
@@ -118,7 +161,10 @@ struct ReaderView: View {
                     ReaderPageView(
                         url: url,
                         referer: referer,
-                        pageNumber: index + 1
+                        pageNumber: index + 1,
+                        prefetchURLs: Array(
+                            model.pageURLs.dropFirst(index + 1).prefix(10)
+                        )
                     )
                 }
             }
@@ -168,6 +214,7 @@ private struct ReaderPageView: View {
     let url: URL
     let referer: URL
     let pageNumber: Int
+    let prefetchURLs: [URL]
 
     @State private var image: UIImage?
     @State private var failed = false
@@ -209,6 +256,7 @@ private struct ReaderPageView: View {
         }
         .task(id: attempt) {
             failed = false
+            ReaderImageStore.shared.prefetch(prefetchURLs, referer: referer)
             image = await ReaderImageStore.shared.image(
                 for: url, referer: referer
             )

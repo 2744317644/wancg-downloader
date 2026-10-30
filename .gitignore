@@ -24,3 +24,5 @@ ios/Info.plist
 .DS_Store
 
 push_gh.py
+
+push_prefetch.py
