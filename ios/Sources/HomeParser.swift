@@ -59,7 +59,7 @@ enum HomeParser {
         var albums: [HomeAlbum] = []
         var seen = Set<String>()
 
-        for card in HTMLParser.blocks("<li>(.*?)</li>", in: html) {
+        for card in HTMLParser.blocks("<li[^>]*>(.*?)</li>", in: html) {
             guard let href = HTMLParser.first(
                 "href=\"(/photos-index-aid-(\\d+)\\.html)\"", in: card
             ), let aid = HTMLParser.first(
