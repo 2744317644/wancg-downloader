@@ -38,8 +38,6 @@ extension HomeAlbum {
 struct MangaFilterMenu: View {
     @AppStorage("manga.languageFilter")
     private var language = MangaLanguageFilter.all.rawValue
-    @AppStorage("manga.hideDownloaded")
-    private var hideDownloaded = false
 
     var body: some View {
         Menu {
@@ -48,8 +46,6 @@ struct MangaFilterMenu: View {
                     Text(filter.title).tag(filter.rawValue)
                 }
             }
-
-            Toggle("隐藏已下载", isOn: $hideDownloaded)
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }

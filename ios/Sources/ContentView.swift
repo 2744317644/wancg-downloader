@@ -4,6 +4,8 @@ import UIKit
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var downloads: DownloadHistory
+    @State private var showAlreadyDownloaded = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +30,14 @@ struct ContentView: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarHidden(true)
+            .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
+                Button("取消", role: .cancel) {}
+                Button("重新下载", role: .destructive) {
+                    Task { await model.download() }
+                }
+            } message: {
+                Text("这部作品已经下载过。重新下载会覆盖同名文件。")
+            }
         }
     }
 
@@ -212,7 +222,11 @@ struct ContentView: View {
             .disabled(model.isBusy)
 
             Button {
-                Task { await model.download() }
+                if let aid = model.preview?.aid, downloads.isDownloaded(aid) {
+                    showAlreadyDownloaded = true
+                } else {
+                    Task { await model.download() }
+                }
             } label: {
                 HStack {
                     if model.isBusy {

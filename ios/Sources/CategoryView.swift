@@ -77,11 +77,8 @@ struct CategoryView: View {
     let title: String
     @StateObject private var model: CategoryFeedModel
     @Environment(\.colorScheme) private var colorScheme
-    @EnvironmentObject private var downloads: DownloadHistory
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
-    @AppStorage("manga.hideDownloaded")
-    private var hideDownloaded = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -191,7 +188,6 @@ struct CategoryView: View {
                         .font(.subheadline)
                     Button("清除筛选") {
                         languageFilter = MangaLanguageFilter.all.rawValue
-                        hideDownloaded = false
                     }
                     .buttonStyle(.bordered)
                     .tint(.mint)
@@ -207,7 +203,6 @@ struct CategoryView: View {
     private var visibleAlbums: [HomeAlbum] {
         model.albums.filter { album in
             album.matches(language: selectedLanguage)
-                && (!hideDownloaded || !downloads.isDownloaded(album.aid))
         }
     }
 

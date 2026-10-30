@@ -70,9 +70,6 @@ struct HomeView: View {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
-    @AppStorage("manga.hideDownloaded")
-    private var hideDownloaded = false
-    @EnvironmentObject private var downloads: DownloadHistory
     @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
@@ -312,7 +309,6 @@ struct HomeView: View {
     private func filtered(_ albums: [HomeAlbum]) -> [HomeAlbum] {
         albums.filter { album in
             album.matches(language: selectedLanguage)
-                && (!hideDownloaded || !downloads.isDownloaded(album.aid))
         }
     }
 
@@ -325,7 +321,6 @@ struct HomeView: View {
                 .font(.subheadline)
             Button("清除筛选") {
                 languageFilter = MangaLanguageFilter.all.rawValue
-                hideDownloaded = false
             }
             .buttonStyle(.bordered)
             .tint(.mint)

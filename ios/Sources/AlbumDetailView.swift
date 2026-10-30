@@ -37,6 +37,8 @@ struct AlbumDetailView: View {
 
     @EnvironmentObject private var downloadModel: AppModel
     @EnvironmentObject private var favorites: FavoritesStore
+    @EnvironmentObject private var downloads: DownloadHistory
+    @State private var showAlreadyDownloaded = false
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model: AlbumDetailModel
 
@@ -108,6 +110,14 @@ struct AlbumDetailView: View {
         }
         .task {
             await model.load()
+        }
+        .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
+            Button("取消", role: .cancel) {}
+            Button("重新下载", role: .destructive) {
+                performDownload()
+            }
+        } message: {
+            Text("《\(displayTitle)》已经下载过。重新下载会覆盖同名文件。")
         }
     }
 
@@ -184,7 +194,13 @@ struct AlbumDetailView: View {
                     } else {
                         Image(systemName: "arrow.down.circle.fill")
                     }
-                    Text(downloadModel.isBusy ? "下载中…" : "下载 ZIP + PDF")
+                    Text(
+                        downloadModel.isBusy
+                            ? "下载中…"
+                            : (downloads.isDownloaded(album.aid)
+                                ? "重新下载 ZIP + PDF"
+                                : "下载 ZIP + PDF")
+                    )
                         .font(.subheadline.bold())
                 }
                 .foregroundStyle(.black)
@@ -287,6 +303,14 @@ struct AlbumDetailView: View {
 
     private func startDownload() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if downloads.isDownloaded(album.aid) {
+            showAlreadyDownloaded = true
+        } else {
+            performDownload()
+        }
+    }
+
+    private func performDownload() {
         downloadModel.input = album.pageURL.absoluteString
         Task { await downloadModel.parseAndDownload() }
     }
