@@ -87,12 +87,8 @@ struct HomeView: View {
                         errorView(error)
                     } else {
                         categoryChips
-                        if visibleSections.isEmpty {
-                            filterEmptyView
-                        } else {
-                            ForEach(visibleSections) { section in
-                                sectionView(section)
-                            }
+                        ForEach(visibleSections) { section in
+                            sectionView(section)
                         }
                         footer
                     }
@@ -246,16 +242,32 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(section.albums) { album in
+            if section.albums.isEmpty {
+                Text(emptySectionMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 14)
+            } else {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(section.albums) { album in
                     NavigationLink {
                         AlbumDetailView(album: album)
                     } label: {
                         AlbumCardView(album: album)
                     }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
+                    }
                 }
             }
+        }
+    }
+
+    private var emptySectionMessage: String {
+        switch selectedLanguage {
+        case .all: return "该分类暂无作品"
+        case .translated: return "该分类暂无翻译作品"
+        case .japanese: return "该分类暂无日语作品"
         }
     }
 
@@ -295,12 +307,10 @@ struct HomeView: View {
     }
 
     private var visibleSections: [HomeSection] {
-        model.sections.compactMap { section in
-            let albums = filtered(section.albums)
-            guard !albums.isEmpty else { return nil }
-            return HomeSection(
+        model.sections.map { section in
+            HomeSection(
                 title: section.title,
-                albums: albums,
+                albums: filtered(section.albums),
                 moreURL: section.moreURL
             )
         }
@@ -310,23 +320,6 @@ struct HomeView: View {
         albums.filter { album in
             album.matches(language: selectedLanguage)
         }
-    }
-
-    private var filterEmptyView: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("没有符合筛选的作品")
-                .font(.subheadline)
-            Button("清除筛选") {
-                languageFilter = MangaLanguageFilter.all.rawValue
-            }
-            .buttonStyle(.bordered)
-            .tint(.mint)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 44)
     }
 
     private var footer: some View {
