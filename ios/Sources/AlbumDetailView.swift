@@ -303,7 +303,8 @@ struct AlbumDetailView: View {
 
     private func startDownload() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        if downloads.isDownloaded(album.aid) {
+        if downloads.isDownloaded(album.aid)
+            || downloads.hasDownloadedFile(matching: displayTitle) {
             showAlreadyDownloaded = true
         } else {
             performDownload()

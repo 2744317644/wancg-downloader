@@ -105,6 +105,27 @@ final class DownloadHistory: ObservableObject {
         downloadedAids.contains(aid)
     }
 
+    func hasDownloadedFile(matching title: String) -> Bool {
+        guard !title.isEmpty else { return false }
+        let documents = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        )[0]
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: documents,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return false }
+        let name = title
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+        return files.contains { file in
+            let ext = file.pathExtension.lowercased()
+            guard ext == "zip" || ext == "pdf" else { return false }
+            return file.deletingPathExtension().lastPathComponent
+                .contains(name)
+        }
+    }
+
     func markDownloaded(_ aid: String) {
         guard !aid.isEmpty, !downloadedAids.contains(aid) else { return }
         downloadedAids.insert(aid)

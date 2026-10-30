@@ -222,7 +222,9 @@ struct ContentView: View {
             .disabled(model.isBusy)
 
             Button {
-                if let aid = model.preview?.aid, downloads.isDownloaded(aid) {
+                if let preview = model.preview,
+                   downloads.isDownloaded(preview.aid)
+                    || downloads.hasDownloadedFile(matching: preview.title) {
                     showAlreadyDownloaded = true
                 } else {
                     Task { await model.download() }
