@@ -297,9 +297,9 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var downloadStatus: some View {
-        if downloadModel.input == album.pageURL.absoluteString,
-           downloadModel.isBusy || downloadModel.zipURL != nil
-            || downloadModel.pdfURL != nil || downloadModel.errorMessage != nil {
+        if downloadModel.input == album.pageURL.absoluteString
+            && (downloadModel.isBusy || downloadModel.zipURL != nil
+                || downloadModel.pdfURL != nil || downloadModel.errorMessage != nil) {
             VStack(alignment: .leading, spacing: 8) {
                 if downloadModel.isBusy {
                     ProgressView(value: downloadModel.downloadProgress)
