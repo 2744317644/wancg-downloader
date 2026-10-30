@@ -26,3 +26,5 @@ ios/Info.plist
 push_gh.py
 
 push_prefetch.py
+
+push_favorites.py

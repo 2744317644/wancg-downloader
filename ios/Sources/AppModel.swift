@@ -94,6 +94,7 @@ final class AppModel: ObservableObject {
             }
             zipURL = downloaded
             downloadProgress = 0.7
+            DownloadHistory.shared.markDownloaded(preview.aid)
 
             if makePDF {
                 status = "正在解压图片…"

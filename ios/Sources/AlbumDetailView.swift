@@ -36,6 +36,7 @@ struct AlbumDetailView: View {
     let album: HomeAlbum
 
     @EnvironmentObject private var downloadModel: AppModel
+    @EnvironmentObject private var favorites: FavoritesStore
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model: AlbumDetailModel
 
@@ -93,6 +94,18 @@ struct AlbumDetailView: View {
         .background(background)
         .navigationTitle("详情")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    favorites.toggle(album: album, preview: model.preview)
+                } label: {
+                    Image(systemName: favorites.isFavorite(album.aid)
+                        ? "heart.fill" : "heart")
+                }
+                .tint(.pink)
+            }
+        }
         .task {
             await model.load()
         }
@@ -183,6 +196,28 @@ struct AlbumDetailView: View {
             }
             .buttonStyle(.plain)
             .disabled(downloadModel.isBusy)
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                favorites.toggle(album: album, preview: model.preview)
+            } label: {
+                Label(
+                    favorites.isFavorite(album.aid) ? "已收藏" : "收藏",
+                    systemImage: favorites.isFavorite(album.aid)
+                        ? "heart.fill" : "heart"
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    favorites.isFavorite(album.aid) ? Color.pink : Color.primary
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(
+                    Color.primary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
