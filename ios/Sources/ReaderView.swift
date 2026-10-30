@@ -254,6 +254,10 @@ private struct ReaderPageView: View {
     @State private var failed = false
     @State private var attempt = 0
 
+    private var placeholderHeight: CGFloat {
+        UIScreen.main.bounds.width * 1.4
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             if let image {
@@ -272,12 +276,12 @@ private struct ReaderPageView: View {
                     .font(.caption)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 320)
+                .frame(height: placeholderHeight)
             } else {
                 ProgressView()
                     .tint(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 320)
+                    .frame(height: placeholderHeight)
             }
 
             Text("\(pageNumber)")
