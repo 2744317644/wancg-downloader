@@ -341,7 +341,7 @@ struct AlbumDetailView: View {
     @ViewBuilder
     private var recommendationsSection: some View {
         let items = (model.preview?.recommendations ?? [])
-            .filter { .aid != album.aid }
+            .filter { $0.aid != album.aid }
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text("看过这本的人也看了")
