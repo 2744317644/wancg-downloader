@@ -58,6 +58,7 @@ struct ProxyCheck {
             print("HOME_CARDS=\(sections.reduce(0) { $0 + $1.albums.count })")
             if let first = sections.first {
                 print("HOME_FIRST=\(first.title) \(first.albums.count)")
+                print("HOME_MORE=\(first.moreURL?.absoluteString ?? "nil")")
             }
             guard sections.count >= 3 else {
                 print("HOME_FAIL=too few sections")
@@ -65,6 +66,10 @@ struct ProxyCheck {
             }
             guard sections.contains(where: { !$0.albums.isEmpty }) else {
                 print("HOME_FAIL=no cards")
+                exit(2)
+            }
+            guard sections.contains(where: { $0.moreURL != nil }) else {
+                print("HOME_FAIL=no category links")
                 exit(2)
             }
 
