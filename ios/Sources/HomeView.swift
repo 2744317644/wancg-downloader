@@ -116,8 +116,8 @@ final class HomeFeedModel: ObservableObject {
             if sections.isEmpty {
                 error = "首页没有解析到作品，可能站点结构变了"
             }
-        } catch {
-            error = error.localizedDescription
+        } catch let err {
+            error = err.localizedDescription
         }
         isLoading = false
     }
