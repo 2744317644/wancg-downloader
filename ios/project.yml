@@ -68,6 +68,7 @@ targets:
       - path: Sources/DoHResolver.swift
       - path: Sources/WnacgClient.swift
       - path: Sources/HTMLParser.swift
+      - path: Sources/HomeParser.swift
       - path: Sources/Models.swift
       - path: Sources/ZipExtractor.swift
       - path: TestMain.swift

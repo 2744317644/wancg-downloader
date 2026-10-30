@@ -49,6 +49,24 @@ struct ProxyCheck {
                 print("EXTRACT_FAIL=too few images")
                 exit(2)
             }
+
+            let homeHTML = try await client.fetchHTML(
+                URL(string: "https://www.wnacg.com/")!
+            )
+            let sections = HomeParser.parse(homeHTML)
+            print("HOME_SECTIONS=\(sections.count)")
+            print("HOME_CARDS=\(sections.reduce(0) { $0 + $1.albums.count })")
+            if let first = sections.first {
+                print("HOME_FIRST=\(first.title) \(first.albums.count)")
+            }
+            guard sections.count >= 3 else {
+                print("HOME_FAIL=too few sections")
+                exit(2)
+            }
+            guard sections.contains(where: { !$0.albums.isEmpty }) else {
+                print("HOME_FAIL=no cards")
+                exit(2)
+            }
             exit(0)
         } catch {
             print("ERROR=\(error.localizedDescription)")
