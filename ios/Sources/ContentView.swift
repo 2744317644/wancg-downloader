@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -31,10 +33,15 @@ struct ContentView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.06, blue: 0.10),
-                Color(red: 0.02, green: 0.03, blue: 0.06),
-            ],
+            colors: colorScheme == .dark
+                ? [
+                    Color(red: 0.04, green: 0.06, blue: 0.10),
+                    Color(red: 0.02, green: 0.03, blue: 0.06),
+                ]
+                : [
+                    Color(uiColor: .systemBackground),
+                    Color(uiColor: .secondarySystemBackground),
+                ],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -61,7 +68,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("wnacg 漫画下载器")
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("ZIP + PDF · 原生 iOS")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -75,7 +82,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("作品链接")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.primary.opacity(0.9))
 
             TextField(
                 "https://www.wnacg.com/photos-index-aid-383877.html",
@@ -87,11 +94,11 @@ struct ContentView: View {
             .keyboardType(.URL)
             .lineLimit(1...3)
             .padding(12)
-            .background(Color.white.opacity(0.05))
+            .background(Color.primary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
 
             Button {
@@ -130,7 +137,7 @@ struct ContentView: View {
                             .scaledToFill()
                     } else {
                         ZStack {
-                            Color.white.opacity(0.04)
+                            Color.primary.opacity(0.05)
                             ProgressView()
                         }
                     }
@@ -141,7 +148,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(preview.title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(4)
 
                     if !preview.category.isEmpty {
@@ -199,7 +206,7 @@ struct ContentView: View {
             Toggle(isOn: $model.makePDF) {
                 Text("同时生成 PDF（300 DPI / 最高质量）")
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(Color.primary.opacity(0.9))
             }
             .tint(.mint)
             .disabled(model.isBusy)
@@ -295,10 +302,10 @@ struct ContentView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(Color.white.opacity(0.04))
+            .fill(Color.primary.opacity(0.05))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
     }
 }

@@ -11,7 +11,7 @@ struct AlbumCardView: View {
 
             Text(album.title)
                 .font(.caption2)
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(Color.primary.opacity(0.92))
                 .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
 
@@ -37,7 +37,7 @@ struct HomeCover: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.045))
+                .fill(Color.primary.opacity(0.05))
 
             if let image {
                 Image(uiImage: image)
@@ -46,13 +46,13 @@ struct HomeCover: View {
             } else {
                 Image(systemName: "photo")
                     .font(.title3)
-                    .foregroundStyle(.white.opacity(0.18))
+                    .foregroundStyle(Color.primary.opacity(0.18))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
         .task(id: album.coverURL) {
             guard let coverURL = album.coverURL else { return }

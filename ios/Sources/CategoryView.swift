@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @MainActor
 final class CategoryFeedModel: ObservableObject {
@@ -75,6 +76,7 @@ final class CategoryFeedModel: ObservableObject {
 struct CategoryView: View {
     let title: String
     @StateObject private var model: CategoryFeedModel
+    @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -199,10 +201,15 @@ struct CategoryView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.06, blue: 0.10),
-                Color(red: 0.02, green: 0.03, blue: 0.06),
-            ],
+            colors: colorScheme == .dark
+                ? [
+                    Color(red: 0.04, green: 0.06, blue: 0.10),
+                    Color(red: 0.02, green: 0.03, blue: 0.06),
+                ]
+                : [
+                    Color(uiColor: .systemBackground),
+                    Color(uiColor: .secondarySystemBackground),
+                ],
             startPoint: .top,
             endPoint: .bottom
         )

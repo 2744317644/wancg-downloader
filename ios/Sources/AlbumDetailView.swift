@@ -18,6 +18,7 @@ final class AlbumDetailModel: ObservableObject {
     func load() async {
         guard !loaded else { return }
         isLoading = true
+        error = nil
         do {
             let client = try WnacgClient()
             self.client = client
@@ -35,6 +36,7 @@ struct AlbumDetailView: View {
     let album: HomeAlbum
 
     @EnvironmentObject private var downloadModel: AppModel
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model: AlbumDetailModel
 
     init(album: HomeAlbum) {
@@ -57,10 +59,25 @@ struct AlbumDetailView: View {
                 actionButtons
                 if !tags.isEmpty { tagGrid }
                 downloadStatus
-                if let error = model.error {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                if let error = model.error, !model.isLoading {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("详情加载失败")
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Button("重试") {
+                            Task { await model.load() }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.orange)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.08), in: RoundedRectangle(
+                        cornerRadius: 12, style: .continuous
+                    ))
                 }
                 if model.isLoading {
                     HStack(spacing: 8) {
@@ -89,7 +106,7 @@ struct AlbumDetailView: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(displayTitle)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(4)
 
                 if let category = model.preview?.category, !category.isEmpty {
@@ -133,7 +150,7 @@ struct AlbumDetailView: View {
             } label: {
                 Label("开始阅读", systemImage: "book.fill")
                     .font(.subheadline.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
                     .background(.ultraThinMaterial, in: RoundedRectangle(
@@ -141,7 +158,7 @@ struct AlbumDetailView: View {
                     ))
                     .overlay(
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
                     )
             }
             .buttonStyle(.plain)
@@ -182,10 +199,10 @@ struct AlbumDetailView: View {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(Color.primary.opacity(0.85))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .background(.white.opacity(0.06), in: Capsule())
+                        .background(Color.primary.opacity(0.06), in: Capsule())
                 }
             }
         }
@@ -227,7 +244,7 @@ struct AlbumDetailView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(0.04), in: RoundedRectangle(
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(
                 cornerRadius: 12, style: .continuous
             ))
         }
@@ -241,10 +258,15 @@ struct AlbumDetailView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.06, blue: 0.10),
-                Color(red: 0.02, green: 0.03, blue: 0.06),
-            ],
+            colors: colorScheme == .dark
+                ? [
+                    Color(red: 0.04, green: 0.06, blue: 0.10),
+                    Color(red: 0.02, green: 0.03, blue: 0.06),
+                ]
+                : [
+                    Color(uiColor: .systemBackground),
+                    Color(uiColor: .secondarySystemBackground),
+                ],
             startPoint: .top,
             endPoint: .bottom
         )

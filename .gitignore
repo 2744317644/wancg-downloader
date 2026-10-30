@@ -13,6 +13,7 @@ push_icons.py
 push_home.py
 push_cat.py
 push_detail.py
+push_ui.py
 preview_sample.html
 ios/build/
 ios/build.log

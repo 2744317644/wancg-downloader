@@ -67,6 +67,8 @@ struct HomeView: View {
     @State private var searchText = ""
     @State private var searchQuery = ""
     @State private var showSearch = false
+    @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -77,8 +79,6 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 22) {
-                    hero
-
                     if model.sections.isEmpty && model.isLoading {
                         loadingView
                     } else if let error = model.error, model.sections.isEmpty {
@@ -115,6 +115,21 @@ struct HomeView: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Picker("外观", selection: ) {
+                            ForEach(AppearanceMode.allCases) { mode in
+                                Label(mode.title, systemImage: mode.icon)
+                                    .tag(mode.rawValue)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: AppearanceMode(
+                            rawValue: appearance
+                        )?.icon ?? "circle.lefthalf.filled")
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await model.load(force: true) }
@@ -138,36 +153,6 @@ struct HomeView: View {
         guard !value.isEmpty else { return }
         searchQuery = value
         showSearch = true
-    }
-
-    private var hero: some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.mint, .blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Image(systemName: "book.pages.fill")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.black.opacity(0.75))
-            }
-            .frame(width: 48, height: 48)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("绅士漫画")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text("最新上架 · 同人志 · 单行本")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.top, 4)
     }
 
     private var categoryChips: some View {
@@ -204,12 +189,12 @@ struct HomeView: View {
     private func chip(_ title: String) -> some View {
         Text(title)
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(Color.primary.opacity(0.9))
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(
-                Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1)
+                Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
     }
 
@@ -227,7 +212,7 @@ struct HomeView: View {
                     .frame(width: 3, height: 15)
                 Text(section.title)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 if let moreURL = section.moreURL {
                     NavigationLink {
@@ -305,10 +290,15 @@ struct HomeView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.06, blue: 0.10),
-                Color(red: 0.02, green: 0.03, blue: 0.06),
-            ],
+            colors: colorScheme == .dark
+                ? [
+                    Color(red: 0.04, green: 0.06, blue: 0.10),
+                    Color(red: 0.02, green: 0.03, blue: 0.06),
+                ]
+                : [
+                    Color(uiColor: .systemBackground),
+                    Color(uiColor: .secondarySystemBackground),
+                ],
             startPoint: .top,
             endPoint: .bottom
         )
