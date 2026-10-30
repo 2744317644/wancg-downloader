@@ -12,12 +12,10 @@ struct ContentView: View {
             ZStack {
                 background
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header
+                    VStack(alignment: .leading, spacing: 16) {
                         inputCard
                         if let preview = model.preview {
                             previewCard(preview)
-                            actionCard
                         }
                         if let error = model.errorMessage {
                             errorCard(error)
@@ -25,6 +23,7 @@ struct ContentView: View {
                         statusBar
                     }
                     .padding(.horizontal, 16)
+                    .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
                 .scrollDismissesKeyboard(.interactively)
@@ -56,36 +55,6 @@ struct ContentView: View {
             endPoint: .bottom
         )
         .ignoresSafeArea()
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.mint, .blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Text("W")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(red: 0.02, green: 0.06, blue: 0.10))
-            }
-            .frame(width: 48, height: 48)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("wnacg 漫画下载器")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Text("ZIP + PDF · 原生 iOS")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.top, 12)
     }
 
     private var inputCard: some View {
@@ -206,12 +175,17 @@ struct ContentView: View {
                 Label("打开原页", systemImage: "safari")
                     .font(.caption)
             }
+
+            Divider()
+                .overlay(Color.primary.opacity(0.06))
+
+            downloadControls
         }
         .padding(16)
         .background(cardBackground)
     }
 
-    private var actionCard: some View {
+    private var downloadControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             Toggle(isOn: $model.makePDF) {
                 Text("同时生成 PDF（300 DPI / 最高质量）")
@@ -273,8 +247,6 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(16)
-        .background(cardBackground)
     }
 
     private func progressRow(title: String, value: Double) -> some View {
