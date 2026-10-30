@@ -39,6 +39,7 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var favorites: FavoritesStore
     @EnvironmentObject private var downloads: DownloadHistory
     @State private var showAlreadyDownloaded = false
+    @State private var didCopyTitle = false
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model: AlbumDetailModel
 
@@ -127,10 +128,31 @@ struct AlbumDetailView: View {
                 .frame(width: 140, height: 187)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text(displayTitle)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
+                HStack(alignment: .top, spacing: 8) {
+                    Text(displayTitle)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(4)
+                        .textSelection(.enabled)
+                        .contextMenu {
+                            Button {
+                                copyTitle()
+                            } label: {
+                                Label("复制标题", systemImage: "doc.on.doc")
+                            }
+                        }
+
+                    Button {
+                        copyTitle()
+                    } label: {
+                        Image(systemName: didCopyTitle
+                            ? "checkmark.circle.fill" : "doc.on.doc")
+                            .font(.caption)
+                            .foregroundStyle(didCopyTitle ? Color.mint : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("复制标题")
+                }
 
                 if let category = model.preview?.category, !category.isEmpty {
                     Text(category)
@@ -152,6 +174,16 @@ struct AlbumDetailView: View {
                 }
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    private func copyTitle() {
+        UIPasteboard.general.string = displayTitle
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        didCopyTitle = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            didCopyTitle = false
         }
     }
 
