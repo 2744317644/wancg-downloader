@@ -1,13 +1,12 @@
 import Foundation
 
 final class WnacgClient {
-    let session: URLSession
+    var session: URLSession { ProxySession.shared.session }
 
     init() throws {
         if let error = ProxySession.shared.startupError {
             throw error
         }
-        session = ProxySession.shared.session
     }
 
     func fetchHTML(_ url: URL, referer: URL? = nil) async throws -> String {
@@ -21,7 +20,7 @@ final class WnacgClient {
         if let referer {
             request.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
         }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await load(request)
         guard let http = response as? HTTPURLResponse else {
             throw WnacgError.message("无效的服务器响应")
         }
@@ -42,11 +41,23 @@ final class WnacgClient {
         if let referer {
             request.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
         }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await load(request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw WnacgError.message("封面加载失败")
         }
         return data
+    }
+
+    /// 后台/息屏后本地代理可能已经失效，遇到 310 时自动重启代理并重试一次。
+    private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch {
+            let code = (error as NSError).code
+            guard code == 310 || code == -310 else { throw error }
+            ProxySession.shared.restart()
+            return try await session.data(for: request)
+        }
     }
 
     func preview(for rawInput: String) async throws -> MangaPreview {

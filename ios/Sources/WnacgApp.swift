@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct WnacgApp: App {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var hasBeenActive = false
 
     init() {
         _ = try? LocalProxy.shared.start()
@@ -16,6 +18,14 @@ struct WnacgApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(colorScheme)
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+                    if hasBeenActive {
+                        ProxySession.shared.restart()
+                    } else {
+                        hasBeenActive = true
+                    }
+                }
         }
     }
 }

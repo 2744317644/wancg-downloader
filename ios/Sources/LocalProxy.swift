@@ -12,6 +12,15 @@ final class LocalProxy {
 
     private init() {}
 
+    func stop() {
+        listener?.stateUpdateHandler = nil
+        listener?.newConnectionHandler = nil
+        listener?.cancel()
+        listener = nil
+        started = false
+        port = 0
+    }
+
     func start() throws -> UInt16 {
         if started { return port }
 
@@ -252,28 +261,52 @@ final class LocalProxy {
 final class ProxySession {
     static let shared = ProxySession()
 
-    let session: URLSession
+    private(set) var session: URLSession
     private(set) var startupError: Error?
     private(set) var proxyPort: UInt16 = 0
 
     private init() {
-        let configuration = URLSessionConfiguration.default
+        session = URLSession(configuration: .default)
+        rebuild(invalidate: false)
+    }
+
+    /// 回到前台后旧端口/旧连接可能已经失效，重建监听和 URLSession。
+    func restart() {
+        LocalProxy.shared.stop()
+        rebuild(invalidate: true)
+    }
+
+    private func rebuild(invalidate: Bool) {
+        if invalidate {
+            session.invalidateAndCancel()
+        }
         do {
             let port = try LocalProxy.shared.start()
             proxyPort = port
-            configuration.connectionProxyDictionary = [
-                "HTTPEnable": true,
-                "HTTPProxy": "127.0.0.1",
-                "HTTPPort": Int(port),
-                "HTTPSEnable": true,
-                "HTTPSProxy": "127.0.0.1",
-                "HTTPSPort": Int(port),
-            ]
+            startupError = nil
+            session = ProxySession.makeSession(port: port)
         } catch {
             startupError = error
+            proxyPort = 0
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 60
+            configuration.timeoutIntervalForResource = 1200
+            session = URLSession(configuration: configuration)
         }
+    }
+
+    private static func makeSession(port: UInt16) -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.connectionProxyDictionary = [
+            "HTTPEnable": true,
+            "HTTPProxy": "127.0.0.1",
+            "HTTPPort": Int(port),
+            "HTTPSEnable": true,
+            "HTTPSProxy": "127.0.0.1",
+            "HTTPSPort": Int(port),
+        ]
         configuration.timeoutIntervalForRequest = 60
         configuration.timeoutIntervalForResource = 1200
-        session = URLSession(configuration: configuration)
+        return URLSession(configuration: configuration)
     }
 }
