@@ -33,6 +33,9 @@ final class AppModel: ObservableObject {
             return
         }
 
+        if client == nil {
+            client = try? WnacgClient()
+        }
         isBusy = true
         errorMessage = nil
         preview = nil
