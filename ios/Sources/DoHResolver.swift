@@ -38,6 +38,14 @@ final class DoHResolver {
             return [normalized]
         }
 
+        if normalized.range(
+            of: "^img\\d+\\.qy0\\.ru$", options: .regularExpression
+        ) != nil {
+            let ips = ["172.66.175.138", "104.20.44.182"]
+            store(ips, for: normalized)
+            return ips
+        }
+
         if let cached = cachedIPs(for: normalized) {
             return cached
         }
