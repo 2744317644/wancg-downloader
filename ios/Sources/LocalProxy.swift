@@ -265,6 +265,9 @@ final class ProxySession {
     private(set) var startupError: Error?
     private(set) var proxyPort: UInt16 = 0
 
+    private let restartLock = NSLock()
+    private var isRestarting = false
+
     private init() {
         session = URLSession(configuration: .default)
         rebuild(invalidate: false)
@@ -272,8 +275,20 @@ final class ProxySession {
 
     /// 回到前台后旧端口/旧连接可能已经失效，重建监听和 URLSession。
     func restart() {
+        restartLock.lock()
+        if isRestarting {
+            restartLock.unlock()
+            return
+        }
+        isRestarting = true
+        restartLock.unlock()
+
         LocalProxy.shared.stop()
         rebuild(invalidate: true)
+
+        restartLock.lock()
+        isRestarting = false
+        restartLock.unlock()
     }
 
     private func rebuild(invalidate: Bool) {
