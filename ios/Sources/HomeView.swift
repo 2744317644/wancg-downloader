@@ -117,7 +117,7 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        Picker("外观", selection: ) {
+                        Picker("外观", selection: $appearance) {
                             ForEach(AppearanceMode.allCases) { mode in
                                 Label(mode.title, systemImage: mode.icon)
                                     .tag(mode.rawValue)
