@@ -12,6 +12,7 @@ push_all.py
 push_icons.py
 push_home.py
 push_cat.py
+push_detail.py
 preview_sample.html
 ios/build/
 ios/build.log

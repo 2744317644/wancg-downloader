@@ -83,6 +83,35 @@ struct ProxyCheck {
                 print("LIST_FAIL=missing cards or next page")
                 exit(2)
             }
+
+            if let searchURL = HomeParser.searchURL("Flugel") {
+                let searchHTML = try await client.fetchHTML(searchURL)
+                let searchAlbums = HomeParser.parseCards(searchHTML)
+                let searchNext = HomeParser.nextPageURL(
+                    searchHTML, current: searchURL
+                )
+                print("SEARCH_CARDS=\(searchAlbums.count)")
+                print("SEARCH_NEXT=\(searchNext?.absoluteString ?? "nil")")
+                guard !searchAlbums.isEmpty, searchNext != nil else {
+                    print("SEARCH_FAIL=missing results or next page")
+                    exit(2)
+                }
+            }
+
+            let itemHTML = try await client.fetchHTML(
+                URL(string: "https://www.wnacg.com/photos-item-aid-383877.html")!
+            )
+            let pageArray = HTMLParser.first(
+                "\"page_url\"\\s*:\\s*\\[(.*?)\\]", in: itemHTML
+            ) ?? ""
+            let readerURLs = HTMLParser.all(
+                "\"(https?://[^\"]+)\"", in: pageArray
+            )
+            print("READER_PAGES=\(readerURLs.count)")
+            if readerURLs.count < 10 {
+                print("READER_FAIL=too few pages")
+                exit(2)
+            }
             exit(0)
         } catch {
             print("ERROR=\(error.localizedDescription)")

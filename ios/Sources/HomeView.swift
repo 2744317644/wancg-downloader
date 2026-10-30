@@ -63,9 +63,10 @@ final class CoverImageStore {
 }
 
 struct HomeView: View {
-    let onSelect: (HomeAlbum) -> Void
-
     @StateObject private var model = HomeFeedModel()
+    @State private var searchText = ""
+    @State private var searchQuery = ""
+    @State private var showSearch = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -96,6 +97,23 @@ struct HomeView: View {
             .background(background)
             .navigationTitle("发现")
             .navigationBarTitleDisplayMode(.large)
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜索漫画"
+            )
+            .onSubmit(of: .search) {
+                submitSearch()
+            }
+            .navigationDestination(isPresented: $showSearch) {
+                if !searchQuery.isEmpty,
+                   let url = HomeParser.searchURL(searchQuery) {
+                    CategoryView(
+                        title: "搜索：\(searchQuery)",
+                        startURL: url
+                    )
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -113,6 +131,13 @@ struct HomeView: View {
                 await model.load()
             }
         }
+    }
+
+    private func submitSearch() {
+        let value = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        searchQuery = value
+        showSearch = true
     }
 
     private var hero: some View {
@@ -151,8 +176,7 @@ struct HomeView: View {
                 NavigationLink {
                     CategoryView(
                         title: "全部作品",
-                        startURL: URL(string: "https://www.wnacg.com/albums.html")!,
-                        onSelect: onSelect
+                        startURL: URL(string: "https://www.wnacg.com/albums.html")!
                     )
                 } label: {
                     chip("全部")
@@ -164,8 +188,7 @@ struct HomeView: View {
                         NavigationLink {
                             CategoryView(
                                 title: section.title,
-                                startURL: moreURL,
-                                onSelect: onSelect
+                                startURL: moreURL
                             )
                         } label: {
                             chip(section.title)
@@ -210,8 +233,7 @@ struct HomeView: View {
                     NavigationLink {
                         CategoryView(
                             title: section.title,
-                            startURL: moreURL,
-                            onSelect: onSelect
+                            startURL: moreURL
                         )
                     } label: {
                         HStack(spacing: 2) {
@@ -231,9 +253,8 @@ struct HomeView: View {
 
             LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(section.albums) { album in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        onSelect(album)
+                    NavigationLink {
+                        AlbumDetailView(album: album)
                     } label: {
                         AlbumCardView(album: album)
                     }

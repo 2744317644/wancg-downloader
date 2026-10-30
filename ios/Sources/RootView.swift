@@ -6,13 +6,9 @@ struct RootView: View {
 
     var body: some View {
         let tabs = TabView(selection: $selection) {
-            HomeView { album in
-                downloadModel.input = album.pageURL.absoluteString
-                selection = 1
-                Task { await downloadModel.parse() }
-            }
-            .tabItem { Label("首页", systemImage: "house.fill") }
-            .tag(0)
+            HomeView()
+                .tabItem { Label("首页", systemImage: "house.fill") }
+                .tag(0)
 
             ContentView(model: downloadModel)
                 .tabItem { Label("下载", systemImage: "arrow.down.circle.fill") }
@@ -23,6 +19,7 @@ struct RootView: View {
                 .tag(2)
         }
         .tint(.mint)
+        .environmentObject(downloadModel)
 
         if #available(iOS 26.0, *) {
             // iOS 26 的系统 TabView 会自动使用 Liquid Glass 外观。

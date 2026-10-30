@@ -75,8 +75,6 @@ final class CategoryFeedModel: ObservableObject {
 
 struct CategoryView: View {
     let title: String
-    let onSelect: (HomeAlbum) -> Void
-
     @StateObject private var model: CategoryFeedModel
 
     private let columns = Array(
@@ -84,13 +82,8 @@ struct CategoryView: View {
         count: 3
     )
 
-    init(
-        title: String,
-        startURL: URL,
-        onSelect: @escaping (HomeAlbum) -> Void
-    ) {
+    init(title: String, startURL: URL) {
         self.title = title
-        self.onSelect = onSelect
         _model = StateObject(wrappedValue: CategoryFeedModel(startURL: startURL))
     }
 
@@ -113,9 +106,8 @@ struct CategoryView: View {
 
                 LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(model.albums) { album in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            onSelect(album)
+                        NavigationLink {
+                            AlbumDetailView(album: album)
                         } label: {
                             AlbumCardView(album: album)
                         }

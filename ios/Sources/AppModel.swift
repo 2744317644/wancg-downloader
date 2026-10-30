@@ -67,8 +67,13 @@ final class AppModel: ObservableObject {
         isBusy = false
     }
 
-    func download() async {
-        guard !isBusy, let preview, let client else { return }
+    func parseAndDownload() async {
+        await parse()
+        guard !isBusy, preview != nil, errorMessage == nil else { return }
+        await download()
+    }
+
+    func download() async {        guard !isBusy, let preview, let client else { return }
         isBusy = true
         errorMessage = nil
         zipURL = nil

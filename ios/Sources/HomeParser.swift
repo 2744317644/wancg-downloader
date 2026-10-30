@@ -72,7 +72,14 @@ enum HomeParser {
             let title = HTMLParser.first(
                 "<a class=\"txtA\"[^>]*>(.*?)</a>", in: card
             ).map(HTMLParser.clean) ?? ""
-            if title.isEmpty { continue }
+            let fallbackTitle = title.isEmpty
+                ? HTMLParser.first(
+                    "<a class=\"ImgA[^\"]*\"[^>]*>.*?<span[^>]*>(.*?)</span>",
+                    in: card
+                ).map(HTMLParser.clean) ?? ""
+                : title
+            if fallbackTitle.isEmpty { continue }
+            let displayTitle = fallbackTitle
 
             let info = HTMLParser.first(
                 "<span class=\"info\">(.*?)</span>", in: card
@@ -98,7 +105,7 @@ enum HomeParser {
             )!
             albums.append(HomeAlbum(
                 aid: aid,
-                title: title,
+                title: displayTitle,
                 coverURL: coverURL,
                 info: info,
                 pages: pages,
@@ -111,11 +118,31 @@ enum HomeParser {
     }
 
     static func nextPageURL(_ html: String, current: URL) -> URL? {
-        guard let href = HTMLParser.first(
+        if let href = HTMLParser.first(
             "<span class=\"next\"><a href=\"([^\"]+)\"", in: html
-        ) else {
-            return nil
+        ) {
+            return URL(string: href, relativeTo: current)?.absoluteURL
         }
-        return URL(string: href, relativeTo: current)?.absoluteURL
+        if let href = HTMLParser.first(
+            "<span class=\"thispage\">.*?</span>\\s*<a href=\"([^\"]+)\"",
+            in: html
+        ) {
+            return URL(string: href, relativeTo: current)?.absoluteURL
+        }
+        return nil
+    }
+
+    static func searchURL(_ query: String) -> URL? {
+        var components = URLComponents(
+            string: "https://www.wnacg.com/search/index.php"
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "m", value: ""),
+            URLQueryItem(name: "syn", value: "yes"),
+            URLQueryItem(name: "f", value: "_all"),
+            URLQueryItem(name: "s", value: "create_time_DESC"),
+        ]
+        return components.url
     }
 }
