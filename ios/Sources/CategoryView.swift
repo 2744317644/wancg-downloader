@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 @MainActor
 final class CategoryFeedModel: ObservableObject {
@@ -165,6 +164,12 @@ struct CategoryView: View {
                         .foregroundStyle(.black)
                     }
                     .padding()
+                } else {
+                    ContentUnavailableView(
+                        "没有找到作品",
+                        systemImage: "magnifyingglass",
+                        description: Text("换个关键词或分类试试")
+                    )
                 }
             }
         }
