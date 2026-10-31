@@ -20,8 +20,8 @@ struct HistoryView: View {
     private var filteredItems: [HistoryEntry] {
         guard !query.isEmpty else { return history.items }
         return history.items.filter {
-            .title.localizedCaseInsensitiveContains(query)
-                || .aid.contains(query)
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.aid.contains(query)
         }
     }
 
