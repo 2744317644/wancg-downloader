@@ -331,7 +331,7 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var downloadStatus: some View {
-        if downloadStartedHere
+        if (downloadStartedHere || downloadModel.isDownloading(album.aid))
             && downloadModel.input == album.pageURL.absoluteString
             && (downloadModel.isBusy || downloadModel.zipURL != nil
                 || downloadModel.pdfURL != nil || downloadModel.errorMessage != nil) {
