@@ -186,11 +186,15 @@ python .\batch_bookmarks.py bookmarks.html --start 5 --limit 10
 
 ### Loon 分流插件
 
-仓库里带有 [`loon/wnacg.plugin`](loon/wnacg.plugin)，可以直接在 Loon 里添加：
+仓库里带有 [`loon/wnacg.lpx`](loon/wnacg.lpx) 和
+[`loon/wnacg.plugin`](loon/wnacg.plugin)，内容相同，直接在 Loon 里添加：
 
 ```text
-https://gist.githubusercontent.com/2744317644/e685e6685071fb84f7aea5a67d1d7c7b/raw/wnacg.plugin
+https://gist.githubusercontent.com/2744317644/e685e6685071fb84f7aea5a67d1d7c7b/raw/wnacg.lpx
 ```
+
+`.lpx` 和 `.plugin` 都是纯文本 Loon 插件，只是扩展名不同；加密插件是
+`.lpxe`，需要 Loon 的插件加密工具生成，不能直接编辑。
 
 它会把这些请求指向 `PROXY` 策略组：
 
