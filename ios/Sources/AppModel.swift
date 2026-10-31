@@ -18,7 +18,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var queue: [QueuedDownload] = []
 
     private var client: WnacgClient?
-    private let queueKey = wnacg.downloadQueue.v1
+    private let queueKey = "wnacg.downloadQueue.v1"
     private var didResumeQueue = false
 
     var hasActiveDownload: Bool {
