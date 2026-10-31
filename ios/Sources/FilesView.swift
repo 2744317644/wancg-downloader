@@ -39,7 +39,7 @@ struct FilesView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return files }
         return files.filter {
-            .name.localizedCaseInsensitiveContains(query)
+            $0.name.localizedCaseInsensitiveContains(query)
         }
     }
 
