@@ -12,7 +12,7 @@ struct HomeAlbum: Identifiable {
 }
 
 struct HomeSection: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let albums: [HomeAlbum]
     let moreURL: URL?

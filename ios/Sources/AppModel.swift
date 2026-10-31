@@ -214,7 +214,11 @@ final class AppModel: ObservableObject {
 
             if makePDF {
                 status = "正在解压图片…"
-                let images = try ZipExtractor.extractImages(from: downloaded)
+                let images = try await Task.detached(
+                    priority: .userInitiated
+                ) {
+                    try ZipExtractor.extractImages(from: downloaded)
+                }.value
                 defer {
                     if let first = images.first {
                         try? FileManager.default.removeItem(
@@ -229,19 +233,23 @@ final class AppModel: ObservableObject {
                 let output = documents.appendingPathComponent(base + ".pdf")
 
                 status = "正在生成 PDF（共 \(images.count) 页）…"
-                let pages = try PDFBuilder.build(
-                    images: images, output: output, dpi: 300
-                ) { current, total in
-                    Task { @MainActor in
-                        let value = total > 0
-                            ? 0.7 + 0.3 * Double(current) / Double(total)
-                            : 0.7
-                        self.pdfProgress = value
-                        DownloadLiveActivityManager.shared.update(
-                            progress: value, status: "正在生成 PDF…"
-                        )
+                let pages = try await Task.detached(
+                    priority: .userInitiated
+                ) {
+                    try PDFBuilder.build(
+                        images: images, output: output, dpi: 300
+                    ) { current, total in
+                        Task { @MainActor in
+                            let value = total > 0
+                                ? 0.7 + 0.3 * Double(current) / Double(total)
+                                : 0.7
+                            self.pdfProgress = value
+                            DownloadLiveActivityManager.shared.update(
+                                progress: value, status: "正在生成 PDF…"
+                            )
+                        }
                     }
-                }
+                }.value
                 pdfURL = output
                 pdfProgress = 1
                 status = "完成：ZIP + PDF（\(pages) 页）"
