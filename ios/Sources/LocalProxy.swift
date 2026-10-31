@@ -260,17 +260,55 @@ final class LocalProxy {
 
 final class ProxySession {
     static let shared = ProxySession()
+    static let systemNetworkKey = "network.useSystemNetwork"
 
     private(set) var session: URLSession
     private(set) var startupError: Error?
     private(set) var proxyPort: UInt16 = 0
+    private var useSystemNetwork: Bool
 
     private let restartLock = NSLock()
     private var isRestarting = false
 
     private init() {
-        session = URLSession(configuration: .default)
-        rebuild(invalidate: false)
+        useSystemNetwork = UserDefaults.standard.bool(
+            forKey: ProxySession.systemNetworkKey
+        )
+        if useSystemNetwork {
+            session = ProxySession.makeSystemSession()
+        } else {
+            session = URLSession(configuration: .default)
+            rebuild(invalidate: false)
+        }
+    }
+
+    func setUseSystemNetwork(_ enabled: Bool) {
+        if useSystemNetwork == enabled { return }
+        restartLock.lock()
+        if isRestarting {
+            restartLock.unlock()
+            return
+        }
+        isRestarting = true
+        useSystemNetwork = enabled
+        UserDefaults.standard.set(
+            enabled, forKey: ProxySession.systemNetworkKey
+        )
+        session.invalidateAndCancel()
+        restartLock.unlock()
+
+        if enabled {
+            LocalProxy.shared.stop()
+            proxyPort = 0
+            startupError = nil
+            session = ProxySession.makeSystemSession()
+        } else {
+            rebuild(invalidate: false)
+        }
+
+        restartLock.lock()
+        isRestarting = false
+        restartLock.unlock()
     }
 
     /// 回到前台后旧端口/旧连接可能已经失效，重建监听和 URLSession。
@@ -283,8 +321,15 @@ final class ProxySession {
         isRestarting = true
         restartLock.unlock()
 
-        LocalProxy.shared.stop()
-        rebuild(invalidate: true)
+        if useSystemNetwork {
+            session.invalidateAndCancel()
+            session = ProxySession.makeSystemSession()
+            startupError = nil
+            proxyPort = 0
+        } else {
+            LocalProxy.shared.stop()
+            rebuild(invalidate: true)
+        }
 
         restartLock.lock()
         isRestarting = false
@@ -308,6 +353,13 @@ final class ProxySession {
             configuration.timeoutIntervalForResource = 1200
             session = URLSession(configuration: configuration)
         }
+    }
+
+    private static func makeSystemSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 1200
+        return URLSession(configuration: configuration)
     }
 
     private static func makeSession(port: UInt16) -> URLSession {

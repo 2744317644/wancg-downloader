@@ -18,12 +18,12 @@ struct RootView: View {
                 .tabItem { Label("收藏", systemImage: "heart.fill") }
                 .tag(2)
 
-            HistoryView()
-                .tabItem { Label("历史", systemImage: "clock.arrow.circlepath") }
-                .tag(3)
-
             FilesView()
                 .tabItem { Label("文件", systemImage: "folder.fill") }
+                .tag(3)
+
+            SettingsView()
+                .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(4)
         }
         .tint(.mint)

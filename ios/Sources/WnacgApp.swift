@@ -7,7 +7,11 @@ struct WnacgApp: App {
     @State private var hasBeenActive = false
 
     init() {
-        _ = try? LocalProxy.shared.start()
+        if !UserDefaults.standard.bool(
+            forKey: ProxySession.systemNetworkKey
+        ) {
+            _ = try? LocalProxy.shared.start()
+        }
     }
 
     private var colorScheme: ColorScheme? {

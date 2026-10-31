@@ -10,6 +10,7 @@ private struct HistorySection: Identifiable {
 struct HistoryView: View {
     @EnvironmentObject private var history: HistoryStore
     @State private var showClearConfirm = false
+    var embedded = false
 
     private var sections: [HistorySection] {
         Dictionary(grouping: history.items) { entry in
@@ -25,8 +26,18 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
+        if embedded {
+            content
+        } else {
+            NavigationStack {
+                content
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        Group {
                 if history.items.isEmpty {
                     ContentUnavailableView(
                         "还没有浏览记录",
@@ -79,7 +90,6 @@ struct HistoryView: View {
             } message: {
                 Text("清空后无法恢复，但不会删除已下载的文件。")
             }
-        }
     }
 
     private func row(_ entry: HistoryEntry) -> some View {

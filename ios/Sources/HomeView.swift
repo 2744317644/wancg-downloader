@@ -67,7 +67,6 @@ struct HomeView: View {
     @State private var searchText = ""
     @State private var searchQuery = ""
     @State private var showSearch = false
-    @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
@@ -115,21 +114,6 @@ struct HomeView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Picker("外观", selection: $appearance) {
-                            ForEach(AppearanceMode.allCases) { mode in
-                                Label(mode.title, systemImage: mode.icon)
-                                    .tag(mode.rawValue)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: AppearanceMode(
-                            rawValue: appearance
-                        )?.icon ?? "circle.lefthalf.filled")
-                    }
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await model.load(force: true) }
