@@ -101,6 +101,7 @@ struct AlbumDetailView: View {
         .background(background)
         .navigationTitle("详情")
         .navigationBarTitleDisplayMode(.inline)
+        .seamlessNavigationBar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

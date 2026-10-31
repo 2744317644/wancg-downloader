@@ -54,6 +54,7 @@ struct FilesView: View {
                 }
             }
             .navigationTitle("文件")
+            .seamlessNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {

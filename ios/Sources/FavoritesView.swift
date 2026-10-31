@@ -58,6 +58,7 @@ struct FavoritesView: View {
             )
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
+            .seamlessNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

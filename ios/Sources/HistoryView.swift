@@ -72,6 +72,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("历史")
+            .seamlessNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {

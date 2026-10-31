@@ -1,5 +1,12 @@
 import SwiftUI
 
+extension View {
+    /// 去掉滚动后导航栏的模糊/分割边界，保持整页连贯。
+    func seamlessNavigationBar() -> some View {
+        toolbarBackground(.hidden, for: .navigationBar)
+    }
+}
+
 enum AppearanceMode: String, CaseIterable, Identifiable {
     case system
     case light

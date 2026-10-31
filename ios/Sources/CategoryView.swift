@@ -131,6 +131,7 @@ struct CategoryView: View {
         .background(background)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .seamlessNavigationBar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()

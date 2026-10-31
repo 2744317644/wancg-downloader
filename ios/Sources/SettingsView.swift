@@ -53,6 +53,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("设置")
+            .seamlessNavigationBar()
         }
     }
 }

@@ -96,6 +96,7 @@ struct HomeView: View {
             .background(background)
             .navigationTitle("发现")
             .navigationBarTitleDisplayMode(.large)
+            .seamlessNavigationBar()
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
