@@ -35,17 +35,28 @@ struct RootView: View {
         .environmentObject(DownloadHistory.shared)
         .environmentObject(HistoryStore.shared)
 
-        VStack(spacing: 0) {
-            if downloadModel.hasActiveDownload || !downloadModel.queue.isEmpty {
-                DownloadTopBar(model: downloadModel) {
-                    selection = 1
-                }
-            }
-
+        Group {
             if #available(iOS 26.0, *) {
                 tabs.tabBarMinimizeBehavior(.onScrollDown)
             } else {
                 tabs
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if downloadModel.hasActiveDownload || !downloadModel.queue.isEmpty {
+                GeometryReader { proxy in
+                    BottomDownloadProgress(model: downloadModel) {
+                        selection = 1
+                    }
+                    .frame(width: min(proxy.size.width * 0.4, 240))
+                    .position(
+                        x: proxy.size.width / 2,
+                        y: proxy.size.height
+                            - proxy.safeAreaInsets.bottom - 64
+                    )
+                }
+                .transition(.opacity)
+                .allowsHitTesting(true)
             }
         }
         .animation(

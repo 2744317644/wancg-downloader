@@ -72,6 +72,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("历史")
+            .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
