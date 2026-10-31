@@ -23,12 +23,14 @@ struct ContentView: View {
                         statusBar
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationBarHidden(true)
+            .navigationTitle("下载")
+            .navigationBarTitleDisplayMode(.inline)
+            .seamlessNavigationBar()
             .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
                 Button("取消", role: .cancel) {}
                 Button("重新下载", role: .destructive) {

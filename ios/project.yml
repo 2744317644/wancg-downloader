@@ -28,8 +28,8 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: wnacg
-        CFBundleShortVersionString: "1.5.0"
-        CFBundleVersion: "150"
+        CFBundleShortVersionString: "1.6.0"
+        CFBundleVersion: "160"
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIFileSharingEnabled: true
@@ -52,8 +52,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wancg.downloader
-        MARKETING_VERSION: "1.5.0"
-        CURRENT_PROJECT_VERSION: "150"
+        MARKETING_VERSION: "1.6.0"
+        CURRENT_PROJECT_VERSION: "160"
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO
@@ -78,8 +78,8 @@ targets:
       path: Widgets/Info.plist
       properties:
         CFBundleDisplayName: wnacg 下载
-        CFBundleShortVersionString: "1.5.0"
-        CFBundleVersion: "150"
+        CFBundleShortVersionString: "1.6.0"
+        CFBundleVersion: "160"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

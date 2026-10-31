@@ -52,7 +52,7 @@ struct RootView: View {
                     .position(
                         x: proxy.size.width / 2,
                         y: proxy.size.height
-                            - proxy.safeAreaInsets.bottom - 64
+                            - proxy.safeAreaInsets.bottom - 58
                     )
                 }
                 .transition(.opacity)

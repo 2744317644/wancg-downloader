@@ -6,6 +6,17 @@ struct FavoritesView: View {
     @EnvironmentObject private var downloads: DownloadHistory
     @State private var exportURL: URL?
     @State private var showExport = false
+    @State private var searchText = ""
+
+    private var query: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func matches(_ item: FavoriteManga) -> Bool {
+        query.isEmpty
+            || item.title.localizedCaseInsensitiveContains(query)
+            || item.aid.contains(query)
+    }
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -13,11 +24,15 @@ struct FavoritesView: View {
     )
 
     private var downloaded: [FavoriteManga] {
-        favorites.items.filter { downloads.isDownloaded($0.aid) }
+        favorites.items
+            .filter { downloads.isDownloaded($0.aid) }
+            .filter { matches($0) }
     }
 
     private var pending: [FavoriteManga] {
-        favorites.items.filter { !downloads.isDownloaded($0.aid) }
+        favorites.items
+            .filter { !downloads.isDownloaded($0.aid) }
+            .filter { matches($0) }
     }
 
     var body: some View {
@@ -28,6 +43,12 @@ struct FavoritesView: View {
                         "还没有收藏",
                         systemImage: "heart",
                         description: Text("在漫画详情页点“收藏”，就会出现在这里")
+                    )
+                } else if noMatches {
+                    ContentUnavailableView(
+                        "没有匹配的收藏",
+                        systemImage: "magnifyingglass",
+                        description: Text("换个关键词试试")
                     )
                 } else {
                     ScrollView {
@@ -59,6 +80,11 @@ struct FavoritesView: View {
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜索收藏"
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

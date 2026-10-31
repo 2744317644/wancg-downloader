@@ -32,7 +32,16 @@ private struct PDFItem: Identifiable {
 struct FilesView: View {
     @State private var files: [DownloadedFile] = []
     @State private var preview: PDFItem?
+    @State private var searchText = ""
     @AppStorage("files.hideZIP") private var hideZIP = false
+
+    private var visibleFiles: [DownloadedFile] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return files }
+        return files.filter {
+            .name.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,9 +52,15 @@ struct FilesView: View {
                         systemImage: "folder",
                         description: Text("在“下载”页完成 ZIP / PDF 后会出现在这里")
                     )
+                } else if visibleFiles.isEmpty {
+                    ContentUnavailableView(
+                        "没有匹配的文件",
+                        systemImage: "magnifyingglass",
+                        description: Text("换个关键词试试")
+                    )
                 } else {
                     List {
-                        ForEach(files) { file in
+                        ForEach(visibleFiles) { file in
                             row(file)
                         }
                         .onDelete(perform: delete)
@@ -56,6 +71,11 @@ struct FilesView: View {
             .navigationTitle("文件")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜索文件"
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -165,7 +185,7 @@ struct FilesView: View {
 
     private func delete(at offsets: IndexSet) {
         for index in offsets {
-            try? FileManager.default.removeItem(at: files[index].url)
+            try? FileManager.default.removeItem(at: visibleFiles[index].url)
         }
         load()
     }

@@ -10,10 +10,27 @@ private struct HistorySection: Identifiable {
 struct HistoryView: View {
     @EnvironmentObject private var history: HistoryStore
     @State private var showClearConfirm = false
+    @State private var searchText = ""
     var embedded = false
 
+    private var query: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredItems: [HistoryEntry] {
+        guard !query.isEmpty else { return history.items }
+        return history.items.filter {
+            .title.localizedCaseInsensitiveContains(query)
+                || .aid.contains(query)
+        }
+    }
+
+    private var noMatches: Bool {
+        !history.items.isEmpty && filteredItems.isEmpty
+    }
+
     private var sections: [HistorySection] {
-        Dictionary(grouping: history.items) { entry in
+        Dictionary(grouping: filteredItems) { entry in
             Calendar.current.startOfDay(for: entry.viewedAt)
         }
         .map { date, entries in
@@ -43,6 +60,12 @@ struct HistoryView: View {
                         "还没有浏览记录",
                         systemImage: "clock.arrow.circlepath",
                         description: Text("在首页点进漫画详情后才会记录")
+                    )
+                } else if noMatches {
+                    ContentUnavailableView(
+                        "没有匹配的历史",
+                        systemImage: "magnifyingglass",
+                        description: Text("换个关键词试试")
                     )
                 } else {
                     List {
@@ -74,6 +97,11 @@ struct HistoryView: View {
             .navigationTitle("历史")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜索历史"
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {

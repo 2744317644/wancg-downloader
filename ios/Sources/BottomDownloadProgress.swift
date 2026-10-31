@@ -19,9 +19,9 @@ struct BottomDownloadProgress: View {
                         .frame(width: proxy.size.width * progress)
                 }
             }
-            .frame(height: 3)
+            .frame(height: 6)
             .padding(.horizontal, 7)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay {
                 Capsule()
