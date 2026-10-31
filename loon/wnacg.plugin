@@ -1,0 +1,30 @@
+#!name = 绅士漫画分流
+#!desc = 绅士漫画 wnacg 网页、图片、ZIP 下载走代理
+#!author = wancg-downloader
+#!date = 2026-11-01
+#!tag = 分流
+#!type = normal
+
+[Rule]
+# 网页与图片
+DOMAIN-SUFFIX,wnacg.com,PROXY
+DOMAIN-SUFFIX,qy0.ru,PROXY
+
+# ZIP 下载
+DOMAIN-SUFFIX,wn01.download,PROXY
+DOMAIN-SUFFIX,wcdn.date,PROXY
+
+# App 内置 DoH（使用系统网络模式时可删掉）
+DOMAIN-SUFFIX,doh.pub,PROXY
+
+# 内置 DoH 会直接连 IP，因此补上实测 IP
+IP-CIDR,104.20.44.182/32,PROXY,no-resolve
+IP-CIDR,172.66.175.138/32,PROXY,no-resolve
+IP-CIDR,185.243.218.90/32,PROXY,no-resolve
+IP-CIDR,51.159.194.108/32,PROXY,no-resolve
+IP-CIDR,172.67.158.148/32,PROXY,no-resolve
+IP-CIDR,104.21.33.39/32,PROXY,no-resolve
+IP-CIDR,172.67.74.237/32,PROXY,no-resolve
+IP-CIDR,104.26.12.109/32,PROXY,no-resolve
+IP-CIDR,1.12.12.12/32,PROXY,no-resolve
+IP-CIDR,120.53.53.53/32,PROXY,no-resolve
