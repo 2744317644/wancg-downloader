@@ -28,11 +28,11 @@ final class AppModel: ObservableObject {
     }
 
     func isQueued(_ aid: String) -> Bool {
-        queue.contains { .aid == aid }
+        queue.contains { $0.aid == aid }
     }
 
     func queuePosition(_ aid: String) -> Int? {
-        guard let index = queue.firstIndex(where: { .aid == aid }) else {
+        guard let index = queue.firstIndex(where: { $0.aid == aid }) else {
             return nil
         }
         return index + 1
