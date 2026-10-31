@@ -68,8 +68,6 @@ struct HomeView: View {
     @State private var searchQuery = ""
     @State private var showSearch = false
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
-    @AppStorage("manga.languageFilter")
-    private var languageFilter = MangaLanguageFilter.all.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
     private let columns = Array(
@@ -87,7 +85,7 @@ struct HomeView: View {
                         errorView(error)
                     } else {
                         categoryChips
-                        ForEach(visibleSections) { section in
+                        ForEach(model.sections) { section in
                             sectionView(section)
                         }
                         footer
@@ -130,10 +128,6 @@ struct HomeView: View {
                             rawValue: appearance
                         )?.icon ?? "circle.lefthalf.filled")
                     }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    MangaFilterMenu()
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -243,7 +237,7 @@ struct HomeView: View {
             }
 
             if section.albums.isEmpty {
-                Text(emptySectionMessage)
+                Text("该分类暂无作品")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -260,14 +254,6 @@ struct HomeView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var emptySectionMessage: String {
-        switch selectedLanguage {
-        case .all: return "该分类暂无作品"
-        case .translated: return "该分类暂无翻译作品"
-        case .japanese: return "该分类暂无日语作品"
         }
     }
 
@@ -300,26 +286,6 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 50)
-    }
-
-    private var selectedLanguage: MangaLanguageFilter {
-        MangaLanguageFilter(rawValue: languageFilter) ?? .all
-    }
-
-    private var visibleSections: [HomeSection] {
-        model.sections.map { section in
-            HomeSection(
-                title: section.title,
-                albums: filtered(section.albums),
-                moreURL: section.moreURL
-            )
-        }
-    }
-
-    private func filtered(_ albums: [HomeAlbum]) -> [HomeAlbum] {
-        albums.filter { album in
-            album.matches(language: selectedLanguage)
-        }
     }
 
     private var footer: some View {
