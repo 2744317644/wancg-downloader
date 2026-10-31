@@ -197,8 +197,10 @@ https://gist.githubusercontent.com/2744317644/e685e6685071fb84f7aea5a67d1d7c7b/r
 - `wnacg.com` 网页；
 - `qy0.ru` 阅读图片；
 - `wn01.download` / `wcdn.date` ZIP 下载；
-- `doh.pub` 内置 DoH；
-- App 直连用的 Cloudflare / 下载服务器 IP。
+- `doh.pub` 内置 DoH。
+
+插件只使用域名规则，兼容性优先；配合 App 的“使用系统网络”模式已经够用。
+如果仍开着内置 DoH，需要额外补 IP 规则，否则 Loon 可能只看到直连 IP。
 
 安装后在插件里点 `PROXY` 选择你的代理策略组。然后在 App 的
 **设置 → 网络** 里打开“使用系统网络 / Loon 分流”，App 就不再走内置 DoH，
