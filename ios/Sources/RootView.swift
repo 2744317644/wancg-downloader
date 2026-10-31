@@ -55,6 +55,19 @@ struct RootView: View {
     /// 上滑展开页签，下滑收起；不必滚到顶部，也不用点击。
     private var tabSwipe: some Gesture {
         DragGesture(minimumDistance: 24)
+            .onChanged { value in
+                let vertical = value.translation.height
+                let horizontal = value.translation.width
+                guard abs(vertical) > 30,
+                      abs(vertical) > abs(horizontal) else {
+                    return
+                }
+                let shouldExpand = vertical < 0
+                guard shouldExpand != tabBarExpanded else { return }
+                withAnimation(.snappy(duration: 0.22)) {
+                    tabBarExpanded = shouldExpand
+                }
+            }
             .onEnded { value in
                 let vertical = value.translation.height
                 let horizontal = value.translation.width
