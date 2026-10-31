@@ -184,6 +184,28 @@ python .\batch_bookmarks.py bookmarks.html --no-pdf --overwrite
 python .\batch_bookmarks.py bookmarks.html --start 5 --limit 10
 ```
 
+### Loon 分流插件
+
+仓库里带有 [`loon/wnacg.plugin`](loon/wnacg.plugin)，可以直接在 Loon 里添加：
+
+```text
+https://gist.githubusercontent.com/2744317644/e685e6685071fb84f7aea5a67d1d7c7b/raw/wnacg.plugin
+```
+
+它会把这些请求指向 `PROXY` 策略组：
+
+- `wnacg.com` 网页；
+- `qy0.ru` 阅读图片；
+- `wn01.download` / `wcdn.date` ZIP 下载；
+- `doh.pub` 内置 DoH；
+- App 直连用的 Cloudflare / 下载服务器 IP。
+
+安装后在插件里点 `PROXY` 选择你的代理策略组。然后在 App 的
+**设置 → 网络** 里打开“使用系统网络 / Loon 分流”，App 就不再走内置 DoH，
+由 Loon 按规则处理。
+
+如果某个代理节点仍被 429，换一个节点即可；插件本身只负责分流，不提供节点。
+
 ### 命令行启动
 
 ```powershell
