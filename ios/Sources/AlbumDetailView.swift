@@ -65,6 +65,7 @@ struct AlbumDetailView: View {
                 actionButtons
                 if !tags.isEmpty { tagGrid }
                 downloadStatus
+                queueBanner
                 recommendationsSection
                 if let error = model.error, !model.isLoading {
                     VStack(alignment: .leading, spacing: 8) {
@@ -203,6 +204,14 @@ struct AlbumDetailView: View {
         .foregroundStyle(.secondary)
     }
 
+    private var isActiveDownload: Bool {
+        downloadModel.isDownloading(album.aid)
+    }
+
+    private var isQueued: Bool {
+        downloadModel.isQueued(album.aid)
+    }
+
     private var actionButtons: some View {
         VStack(spacing: 10) {
             NavigationLink {
@@ -225,19 +234,14 @@ struct AlbumDetailView: View {
 
             Button(action: startDownload) {
                 HStack(spacing: 8) {
-                    if downloadModel.isBusy {
+                    if isActiveDownload {
                         ProgressView()
                             .tint(.black)
                     } else {
-                        Image(systemName: "arrow.down.circle.fill")
+                        Image(systemName: isQueued
+                            ? "clock" : "arrow.down.circle.fill")
                     }
-                    Text(
-                        downloadModel.isBusy
-                            ? "下载中…"
-                            : (downloads.isDownloaded(album.aid)
-                                ? "重新下载 ZIP + PDF"
-                                : "下载 ZIP + PDF")
-                    )
+                    Text(downloadButtonTitle)
                         .font(.subheadline.bold())
                 }
                 .foregroundStyle(.black)
@@ -248,7 +252,7 @@ struct AlbumDetailView: View {
                 ))
             }
             .buttonStyle(.plain)
-            .disabled(downloadModel.isBusy)
+            .disabled(isActiveDownload || isQueued)
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -294,6 +298,35 @@ struct AlbumDetailView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var queueBanner: some View {
+        if let position = downloadModel.queuePosition(album.aid) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                Text("已加入下载队列，第 \(position) 位")
+            }
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(
+                cornerRadius: 10, style: .continuous
+            ))
+        }
+    }
+
+    private var downloadButtonTitle: String {
+        if isActiveDownload { return "下载中…" }
+        if let position = downloadModel.queuePosition(album.aid) {
+            return "已加入队列（第 \(position) 位）"
+        }
+        if downloadModel.hasActiveDownload {
+            return "加入下载队列"
+        }
+        return downloads.isDownloaded(album.aid)
+            ? "重新下载 ZIP + PDF" : "下载 ZIP + PDF"
     }
 
     @ViewBuilder
@@ -376,6 +409,7 @@ struct AlbumDetailView: View {
     }
 
     private func startDownload() {
+        guard !isActiveDownload, !isQueued else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if downloads.isDownloaded(album.aid)
             || downloads.hasDownloadedFile(matching: displayTitle) {
@@ -387,8 +421,7 @@ struct AlbumDetailView: View {
 
     private func performDownload() {
         downloadStartedHere = true
-        downloadModel.input = album.pageURL.absoluteString
-        Task { await downloadModel.parseAndDownload() }
+        downloadModel.enqueue(album: album)
     }
 
     private var background: some View {

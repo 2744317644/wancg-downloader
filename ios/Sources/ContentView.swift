@@ -268,6 +268,11 @@ struct ContentView: View {
             Image(systemName: "info.circle")
             Text(model.status)
             Spacer()
+            if !model.queue.isEmpty {
+                Label("队列 \(model.queue.count)", systemImage: "clock")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)

@@ -14,8 +14,29 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var zipURL: URL?
     @Published var pdfURL: URL?
+    @Published private(set) var activeAid: String?
+    @Published private(set) var queue: [HomeAlbum] = []
 
     private var client: WnacgClient?
+
+    var hasActiveDownload: Bool {
+        activeAid != nil || isBusy
+    }
+
+    func isDownloading(_ aid: String) -> Bool {
+        activeAid == aid
+    }
+
+    func isQueued(_ aid: String) -> Bool {
+        queue.contains { .aid == aid }
+    }
+
+    func queuePosition(_ aid: String) -> Int? {
+        guard let index = queue.firstIndex(where: { .aid == aid }) else {
+            return nil
+        }
+        return index + 1
+    }
 
     init() {
         do {
@@ -76,7 +97,44 @@ final class AppModel: ObservableObject {
         await download()
     }
 
-    func download() async {        guard !isBusy, let preview, let client else { return }
+    func enqueue(album: HomeAlbum) {
+        guard activeAid != album.aid,
+              !isQueued(album.aid) else { return }
+
+        if activeAid == nil && !isBusy && queue.isEmpty {
+            startQueued(album)
+        } else {
+            queue.append(album)
+        }
+    }
+
+    private func startQueued(_ album: HomeAlbum) {
+        activeAid = album.aid
+        input = album.pageURL.absoluteString
+        Task {
+            await parse()
+            if preview != nil, errorMessage == nil {
+                await download()
+                if activeAid == album.aid {
+                    activeAid = nil
+                    processNext()
+                }
+            } else {
+                activeAid = nil
+                processNext()
+            }
+        }
+    }
+
+    private func processNext() {
+        guard activeAid == nil, !isBusy, !queue.isEmpty else { return }
+        let next = queue.removeFirst()
+        startQueued(next)
+    }
+
+    func download() async {
+        guard !isBusy, let preview, let client else { return }
+        activeAid = preview.aid
         isBusy = true
         errorMessage = nil
         zipURL = nil
@@ -140,5 +198,7 @@ final class AppModel: ObservableObject {
             status = "下载失败"
         }
         isBusy = false
+        activeAid = nil
+        processNext()
     }
 }
