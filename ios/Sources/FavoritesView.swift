@@ -68,7 +68,7 @@ struct FavoritesView: View {
                     .disabled(favorites.items.isEmpty)
                 }
             }
-            .sheet(isPresented: ) {
+            .sheet(isPresented: $showExport) {
                 if let exportURL {
                     FavoritesExportSheet(url: exportURL)
                 }
