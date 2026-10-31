@@ -43,21 +43,48 @@ final class WnacgClient {
         }
         let (data, response) = try await load(request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw WnacgError.message("封面加载失败")
+            throw WnacgError.message("图片加载失败")
         }
         return data
     }
 
-    /// 后台/息屏后本地代理可能已经失效，遇到 310 时自动重启代理并重试一次。
+    /// 后台/息屏后本地代理可能已经失效；遇到 310 重启代理，
+    /// 遇到 HTTP 429 时按 Retry-After / 指数退避重试。
     private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch {
-            let code = (error as NSError).code
-            guard code == 310 || code == -310 else { throw error }
-            ProxySession.shared.restart()
-            return try await session.data(for: request)
+        var attempt = 0
+
+        while true {
+            do {
+                let result = try await session.data(for: request)
+                if let http = result.1 as? HTTPURLResponse,
+                   http.statusCode == 429,
+                   attempt < 2 {
+                    let delay = retryDelay(http, attempt: attempt)
+                    attempt += 1
+                    try? await Task.sleep(
+                        nanoseconds: UInt64(delay * 1_000_000_000)
+                    )
+                    continue
+                }
+                return result
+            } catch {
+                let code = (error as NSError).code
+                guard code == 310 || code == -310, attempt < 2 else {
+                    throw error
+                }
+                attempt += 1
+                ProxySession.shared.restart()
+                try? await Task.sleep(nanoseconds: 300_000_000)
+            }
         }
+    }
+
+    private func retryDelay(_ response: HTTPURLResponse, attempt: Int) -> Double {
+        if let raw = response.value(forHTTPHeaderField: "Retry-After"),
+           let seconds = Double(raw.trimmingCharacters(in: .whitespaces)) {
+            return min(max(seconds, 1), 8)
+        }
+        return attempt == 0 ? 2 : 4
     }
 
     func preview(for rawInput: String) async throws -> MangaPreview {

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from html.parser import HTMLParser
@@ -116,7 +117,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--report", metavar="文件",
                         help="报告保存路径（默认 输出目录/batch_report.txt）")
     parser.add_argument("--dry-run", action="store_true", help="只解析，不下载")
+    parser.add_argument("--delay", type=float, default=2.0, metavar="秒",
+                        help="每个作品之间的间隔（默认 2 秒，降低 429 概率）")
     return parser
+
+
+def probe_with_retry(
+    http: core.HttpClient,
+    album: core.Album,
+    attempts: int = 3,
+) -> tuple[Optional[int], Optional[int]]:
+    size, status = core.probe_size(http, album.zip_url or "", album.page_url)
+    for index in range(1, attempts):
+        if status != 429:
+            break
+        wait = 8 * index
+        print(f"  [限流] HTTP 429，等待 {wait} 秒后重试…")
+        time.sleep(wait)
+        size, status = core.probe_size(http, album.zip_url or "", album.page_url)
+    return size, status
 
 
 def download_one(http: core.HttpClient, bookmark: Bookmark, args: argparse.Namespace,
@@ -126,13 +145,22 @@ def download_one(http: core.HttpClient, bookmark: Bookmark, args: argparse.Names
     album = core.fetch_album(http, target)
     result.title = album.title or ""
 
-    size, status = core.probe_size(http, album.zip_url or "", album.page_url)
+    size, status = probe_with_retry(http, album)
     print(f"  标题：{album.title or '（未获取到）'}")
     print(f"  文件：{album.filename}（{core.human_size(size)}）")
 
+    if status == 429:
+        raise core.DownloadError(
+            "服务器限流（HTTP 429），请等几分钟再试，或改用走代理的批量下载书签.bat"
+        )
+
     if core.is_dead_status(status):
         album = core.switch_to_worker(http, album, status)
-        size, status = core.probe_size(http, album.zip_url or "", album.page_url)
+        size, status = probe_with_retry(http, album)
+        if status == 429:
+            raise core.DownloadError(
+                "服务器限流（HTTP 429），请等几分钟再试，或改用走代理的批量下载书签.bat"
+            )
         if core.is_dead_status(status):
             raise core.DownloadError(
                 f"Server 1 直链不可用（HTTP {status}），请稍后重试"
@@ -298,6 +326,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             print(f"  [异常] {result.message}", file=sys.stderr)
         results.append(result)
+        if args.delay > 0 and index < len(selected):
+            time.sleep(args.delay)
         print()
 
     report_path = Path(args.report).expanduser() if args.report else output_dir / "batch_report.txt"

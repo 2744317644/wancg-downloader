@@ -90,7 +90,7 @@ final class ReaderImageStore {
     private var prefetching = Set<URL>()
     private var prefetchQueue: [(url: URL, referer: URL)] = []
     private var activePrefetch = 0
-    private let maxConcurrentPrefetch = 3
+    private let maxConcurrentPrefetch = 1
 
     private init() {
         cache.countLimit = 16
@@ -154,6 +154,7 @@ final class ReaderImageStore {
             activePrefetch += 1
             Task { [weak self] in
                 guard let self else { return }
+                try? await Task.sleep(for: .milliseconds(120))
                 _ = await self.image(for: item.url, referer: item.referer)
                 self.finishPrefetch(item.url)
             }
