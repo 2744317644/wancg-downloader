@@ -15,9 +15,11 @@ final class AppModel: ObservableObject {
     @Published var zipURL: URL?
     @Published var pdfURL: URL?
     @Published private(set) var activeAid: String?
-    @Published private(set) var queue: [HomeAlbum] = []
+    @Published private(set) var queue: [QueuedDownload] = []
 
     private var client: WnacgClient?
+    private let queueKey = wnacg.downloadQueue.v1
+    private var didResumeQueue = false
 
     var hasActiveDownload: Bool {
         activeAid != nil || isBusy
@@ -44,6 +46,30 @@ final class AppModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+        loadQueue()
+    }
+
+    /// App 启动后把上次未开始的任务继续跑起来。
+    func resumeQueueIfNeeded() {
+        guard !didResumeQueue else { return }
+        didResumeQueue = true
+        guard activeAid == nil, !isBusy else { return }
+        processNext()
+    }
+
+    private func persistQueue() {
+        guard let data = try? JSONEncoder().encode(queue) else { return }
+        UserDefaults.standard.set(data, forKey: queueKey)
+    }
+
+    private func loadQueue() {
+        guard let data = UserDefaults.standard.data(forKey: queueKey),
+              let saved = try? JSONDecoder().decode(
+                  [QueuedDownload].self, from: data
+              ) else {
+            return
+        }
+        queue = saved
     }
 
     func parse() async {
@@ -101,15 +127,18 @@ final class AppModel: ObservableObject {
         guard activeAid != album.aid,
               !isQueued(album.aid) else { return }
 
+        let item = QueuedDownload(album: album)
         if activeAid == nil && !isBusy && queue.isEmpty {
-            startQueued(album)
+            startQueued(item)
         } else {
-            queue.append(album)
+            queue.append(item)
+            persistQueue()
         }
     }
 
-    private func startQueued(_ album: HomeAlbum) {
-        activeAid = album.aid
+    private func startQueued(_ item: QueuedDownload) {
+        let album = item.homeAlbum
+        activeAid = item.aid
         input = album.pageURL.absoluteString
         Task {
             await parse()
@@ -129,6 +158,7 @@ final class AppModel: ObservableObject {
     private func processNext() {
         guard activeAid == nil, !isBusy, !queue.isEmpty else { return }
         let next = queue.removeFirst()
+        persistQueue()
         startQueued(next)
     }
 

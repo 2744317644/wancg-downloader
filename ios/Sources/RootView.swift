@@ -27,6 +27,9 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(.mint)
+        .task {
+            downloadModel.resumeQueueIfNeeded()
+        }
         .environmentObject(downloadModel)
         .environmentObject(FavoritesStore.shared)
         .environmentObject(DownloadHistory.shared)
