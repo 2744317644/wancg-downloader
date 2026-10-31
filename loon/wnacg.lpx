@@ -1,0 +1,10 @@
+#!name=绅士漫画分流
+#!desc=让 wnacg 网页、图片和 ZIP 下载走代理
+#!author=wancg-downloader
+
+[Rule]
+DOMAIN-SUFFIX,wnacg.com,PROXY
+DOMAIN-SUFFIX,qy0.ru,PROXY
+DOMAIN-SUFFIX,wn01.download,PROXY
+DOMAIN-SUFFIX,wcdn.date,PROXY
+DOMAIN-SUFFIX,doh.pub,PROXY
