@@ -56,7 +56,7 @@ struct RootView: View {
                     )
                 }
                 .transition(.opacity)
-                .allowsHitTesting(true)
+                .allowsHitTesting(false)
             }
         }
         .animation(
