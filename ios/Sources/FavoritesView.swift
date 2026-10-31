@@ -35,6 +35,10 @@ struct FavoritesView: View {
             .filter { matches($0) }
     }
 
+    private var noMatches: Bool {
+        !favorites.items.isEmpty && downloaded.isEmpty && pending.isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             Group {
