@@ -51,6 +51,8 @@
 - **重复下载提示**：已经下载过的作品再次点下载时，会先弹出“已经下载过”确认；
   取消不会重新下载，确认后才重新下载并覆盖同名文件；
 - **下载**：粘贴链接，解析封面、标题、页数、标签；下载 ZIP、解压、生成 300 DPI PDF；
+- **下载队列**：下载一部作品时进入别的详情页，下载按钮会变成“加入下载队列”；
+  可以连续加入多部，前一部完成后自动开始下一部；
 - **文件**：浏览 App Documents 里的 ZIP / PDF，点击 PDF 直接预览（PDFKit），支持分享和删除；
   文件页右上角可开启“隐藏 ZIP 文件”，只显示 PDF，下载记录不受影响；
 - **收藏**：详情页可收藏/取消收藏；收藏页分成“已下载 / 未下载”两组，
@@ -149,6 +151,27 @@ downloads/
 5. 完成后点“打开 PDF”或“下载 ZIP”。
 
 如果浏览器没有自动打开，复制启动窗口里显示的地址手动访问即可。
+
+### 批量下载书签
+
+支持把 Chrome / Edge / Firefox 导出的 HTML 书签直接批量下载：
+
+1. 双击 **`批量下载书签.bat`**，把书签 HTML 拖进窗口；
+2. 或双击 **`批量下载书签-直连.bat`**（DoH 直连）；
+3. 脚本会先解析书签里的 wnacg 作品，去重后逐个下载；
+4. 结束后在控制台和 `downloads/batch_report.txt` 里列出：
+   - 成功作品及 ZIP/PDF 路径；
+   - 跳过的作品（文件已存在）；
+   - 失败作品及具体原因。
+
+命令行用法：
+
+```powershell
+python .\batch_bookmarks.py bookmarks.html
+python .\batch_bookmarks.py bookmarks.html --direct -o D:\manga
+python .\batch_bookmarks.py bookmarks.html --no-pdf --overwrite
+python .\batch_bookmarks.py bookmarks.html --start 5 --limit 10
+```
 
 ### 命令行启动
 
