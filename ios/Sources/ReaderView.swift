@@ -207,6 +207,7 @@ struct ReaderView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !model.pageURLs.isEmpty {
