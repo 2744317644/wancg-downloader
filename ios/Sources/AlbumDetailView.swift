@@ -348,6 +348,17 @@ struct AlbumDetailView: View {
                     Text(error)
                         .font(.caption2)
                         .foregroundStyle(.orange)
+
+                    if !downloadModel.isBusy {
+                        Button {
+                            Task { await downloadModel.retryCurrentDownload() }
+                        } label: {
+                            Label("重试下载", systemImage: "arrow.clockwise")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.orange)
+                    }
                 }
 
                 HStack(spacing: 14) {

@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     private var client: WnacgClient?
     private let queueKey = "wnacg.downloadQueue.v1"
     private var didResumeQueue = false
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     var hasActiveDownload: Bool {
         activeAid != nil || isBusy
@@ -162,6 +163,11 @@ final class AppModel: ObservableObject {
         startQueued(next)
     }
 
+    func retryCurrentDownload() async {
+        guard !isBusy, preview != nil else { return }
+        await download()
+    }
+
     func download() async {
         guard !isBusy, let preview, let client else { return }
         activeAid = preview.aid
@@ -172,6 +178,19 @@ final class AppModel: ObservableObject {
         downloadProgress = 0
         pdfProgress = 0
         status = "正在获取下载地址…"
+        beginBackgroundTask()
+        DownloadLiveActivityManager.shared.start(
+            aid: preview.aid, title: preview.title
+        )
+        DownloadLiveActivityManager.shared.update(
+            progress: 0, status: status
+        )
+        defer {
+            endBackgroundTask()
+            DownloadLiveActivityManager.shared.end(
+                progress: downloadProgress, status: status
+            )
+        }
 
         do {
             let info = try await client.downloadInfo(reqID: preview.aid)
@@ -181,10 +200,16 @@ final class AppModel: ObservableObject {
             ) { value in
                 Task { @MainActor in
                     self.downloadProgress = value * 0.7
+                    DownloadLiveActivityManager.shared.update(
+                        progress: value * 0.7, status: "正在下载 ZIP…"
+                    )
                 }
             }
             zipURL = downloaded
             downloadProgress = 0.7
+            DownloadLiveActivityManager.shared.update(
+                progress: 0.7, status: "正在处理 PDF…"
+            )
             DownloadHistory.shared.markDownloaded(preview.aid)
 
             if makePDF {
@@ -208,9 +233,13 @@ final class AppModel: ObservableObject {
                     images: images, output: output, dpi: 300
                 ) { current, total in
                     Task { @MainActor in
-                        self.pdfProgress = total > 0
+                        let value = total > 0
                             ? 0.7 + 0.3 * Double(current) / Double(total)
                             : 0.7
+                        self.pdfProgress = value
+                        DownloadLiveActivityManager.shared.update(
+                            progress: value, status: "正在生成 PDF…"
+                        )
                     }
                 }
                 pdfURL = output
@@ -230,5 +259,20 @@ final class AppModel: ObservableObject {
         isBusy = false
         activeAid = nil
         processNext()
+    }
+
+    private func beginBackgroundTask() {
+        guard backgroundTask == .invalid else { return }
+        backgroundTask = UIApplication.shared.beginBackgroundTask(
+            withName: "wnacg-download"
+        ) { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
     }
 }

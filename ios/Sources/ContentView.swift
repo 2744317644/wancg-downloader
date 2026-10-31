@@ -287,6 +287,18 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(Color.red.opacity(0.9))
             Spacer()
+            Button("重试") {
+                Task {
+                    if model.preview != nil {
+                        await model.retryCurrentDownload()
+                    } else {
+                        await model.parse()
+                    }
+                }
+            }
+            .font(.caption)
+            .buttonStyle(.bordered)
+            .tint(.red)
         }
         .padding(12)
         .background(Color.red.opacity(0.08))
