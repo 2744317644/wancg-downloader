@@ -23,7 +23,7 @@ struct ContentView: View {
                         statusBar
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 16)
                     .padding(.bottom, 32)
                 }
                 .scrollDismissesKeyboard(.interactively)

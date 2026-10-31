@@ -4,6 +4,8 @@ import UIKit
 struct FavoritesView: View {
     @EnvironmentObject private var favorites: FavoritesStore
     @EnvironmentObject private var downloads: DownloadHistory
+    @State private var exportURL: URL?
+    @State private var showExport = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -55,10 +57,35 @@ struct FavoritesView: View {
                 Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
             )
             .navigationTitle("收藏")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        exportFavorites()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(favorites.items.isEmpty)
+                }
+            }
+            .sheet(isPresented: ) {
+                if let exportURL {
+                    FavoritesExportSheet(url: exportURL)
+                }
+            }
             .onAppear {
                 downloads.reconcile(with: favorites.items)
             }
         }
+    }
+
+    private func exportFavorites() {
+        guard let url = FavoritesExporter.write(
+            items: favorites.items,
+            downloadedAids: downloads.downloadedAids
+        ) else { return }
+        exportURL = url
+        showExport = true
     }
 
     private func section(
@@ -121,6 +148,50 @@ struct FavoritesView: View {
                 favorites.remove(item)
             } label: {
                 Label("取消收藏", systemImage: "heart.slash")
+            }
+        }
+    }
+}
+
+
+private struct FavoritesExportSheet: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 14) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 42))
+                    .foregroundStyle(.mint)
+                Text("收藏夹 HTML 已生成")
+                    .font(.headline)
+                Text("已下载和未下载会分别放在两个书签文件夹中。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Text(url.lastPathComponent)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+
+                ShareLink(item: url) {
+                    Label("分享 / 存储到文件", systemImage: "square.and.arrow.up")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.mint)
+                .foregroundStyle(.black)
+                .padding(.top, 6)
+            }
+            .padding(24)
+            .navigationTitle("导出收藏夹")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
             }
         }
     }

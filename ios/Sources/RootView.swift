@@ -35,11 +35,23 @@ struct RootView: View {
         .environmentObject(DownloadHistory.shared)
         .environmentObject(HistoryStore.shared)
 
-        if #available(iOS 26.0, *) {
-            tabs.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            tabs
+        VStack(spacing: 0) {
+            if downloadModel.hasActiveDownload || !downloadModel.queue.isEmpty {
+                DownloadTopBar(model: downloadModel) {
+                    selection = 1
+                }
+            }
+
+            if #available(iOS 26.0, *) {
+                tabs.tabBarMinimizeBehavior(.onScrollDown)
+            } else {
+                tabs
+            }
         }
+        .animation(
+            .snappy(duration: 0.22),
+            value: downloadModel.hasActiveDownload
+        )
     }
 }
 
