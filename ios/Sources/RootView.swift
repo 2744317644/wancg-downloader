@@ -3,9 +3,10 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var downloadModel = AppModel()
     @State private var selection = 0
+    @State private var tabBarExpanded = false
 
-    var body: some View {
-        let tabs = TabView(selection: $selection) {
+    private var tabs: some View {
+        TabView(selection: $selection) {
             HomeView()
                 .tabItem { Label("首页", systemImage: "house.fill") }
                 .tag(0)
@@ -26,18 +27,45 @@ struct RootView: View {
                 .tabItem { Label("文件", systemImage: "folder.fill") }
                 .tag(4)
         }
+        .toolbar(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 76)
+        }
         .tint(.mint)
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            tabs
+
+            FloatingTabBar(
+                selection: $selection,
+                expanded: $tabBarExpanded
+            )
+            .padding(.horizontal, 14)
+            .padding(.bottom, 6)
+        }
+        .simultaneousGesture(tabSwipe)
         .environmentObject(downloadModel)
         .environmentObject(FavoritesStore.shared)
         .environmentObject(DownloadHistory.shared)
         .environmentObject(HistoryStore.shared)
+    }
 
-        if #available(iOS 26.0, *) {
-            // iOS 26 的系统 TabView 会自动使用 Liquid Glass 外观。
-            tabs.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            tabs
-        }
+    /// 上滑展开页签，下滑收起；不必滚到顶部，也不用点击。
+    private var tabSwipe: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                let vertical = value.translation.height
+                let horizontal = value.translation.width
+                guard abs(vertical) > 24,
+                      abs(vertical) > abs(horizontal) else {
+                    return
+                }
+                withAnimation(.snappy(duration: 0.22)) {
+                    tabBarExpanded = vertical < 0
+                }
+            }
     }
 }
 
