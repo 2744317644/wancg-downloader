@@ -30,7 +30,7 @@ struct BottomDownloadProgress: View {
             .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("下载进度 \(Int(progress * 100))%，点击查看下载页")
+        .accessibilityLabel("下载进度 \(Int(progress * 100))%")
         .animation(.linear(duration: 0.2), value: progress)
     }
 }
