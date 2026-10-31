@@ -157,6 +157,9 @@ downloads/
 
 支持把 Chrome / Edge / Firefox 导出的 HTML 书签直接批量下载：
 
+> 不要双击 `batch_bookmarks.py`。Windows 默认不一定把 `.py` 关联到 Python，
+> 会弹出“选择打开方式”。请双击下面的 `.bat` 启动器，由它自动寻找 Python。
+
 1. 双击 **`批量下载书签.bat`**，把书签 HTML 拖进窗口；
 2. 或双击 **`批量下载书签-直连.bat`**（DoH 直连）；
 3. 脚本会先解析书签里的 wnacg 作品，去重后逐个下载；
