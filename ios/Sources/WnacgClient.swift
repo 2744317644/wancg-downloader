@@ -262,9 +262,10 @@ final class WnacgClient {
         referer: URL,
         progress: @escaping (Double) -> Void
     ) async throws -> URL {
-        let downloads = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
+        let downloads = DownloadFolders.zipDirectory
+        try FileManager.default.createDirectory(
+            at: downloads, withIntermediateDirectories: true
+        )
         let destination = downloads.appendingPathComponent(info.filename)
         let partial = destination.appendingPathExtension("part")
         try? FileManager.default.removeItem(at: partial)
