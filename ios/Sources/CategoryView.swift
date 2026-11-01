@@ -88,12 +88,7 @@ struct CategoryView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
-    @State private var atBottom = false
-
-    private let columns = Array(
-        repeating: GridItem(.flexible(), spacing: 10),
-        count: 3
-    )
+    @State private var selectedAlbum: HomeAlbum?
 
     init(
         title: String,
@@ -107,58 +102,25 @@ struct CategoryView: View {
 
     var body: some View {
         let albums = visibleAlbums
-        let loadTriggerAids = Set(albums.suffix(3).map(\.aid))
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                if !albums.isEmpty {
-                    HStack {
-                        Text("\(albums.count) 部作品")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if model.pageCount > 0 {
-                            Text("第 \(model.pageCount) 页")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(albums) { album in
-                        NavigationLink {
-                            AlbumDetailView(album: album)
-                        } label: {
-                            AlbumCardView(album: album)
-                        }
-                        .buttonStyle(.plain)
-                        .onAppear {
-                            if loadTriggerAids.contains(album.aid) {
-                                Task { await model.loadMore() }
-                            }
-                        }
-                    }
-                }
-
-                footer
-
-                Color.clear
-                    .frame(height: 1)
-                    .onAppear {
-                        atBottom = true
-                        Task { await model.loadMore() }
-                    }
-                    .onDisappear {
-                        atBottom = false
-                    }
+        CategoryGridView(
+            albums: albums,
+            isLoading: model.isLoading,
+            hasMore: model.hasMore,
+            onSelect: { selectedAlbum = $0 },
+            onLoadMore: {
+                Task { await model.loadMore() }
+            },
+            onRefresh: {
+                await model.reload()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 28)
-        }
+        )
         .background(background)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
+        .navigationDestination(item: $selectedAlbum) { album in
+            AlbumDetailView(album: album)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
@@ -173,19 +135,8 @@ struct CategoryView: View {
                 .disabled(model.isLoading)
             }
         }
-        .refreshable {
-            await model.reload()
-        }
         .task {
             await model.loadIfNeeded()
-        }
-        .onChange(of: model.albums.count) { _, _ in
-            guard atBottom else { return }
-            Task {
-                try? await Task.sleep(for: .milliseconds(250))
-                guard atBottom, !model.isLoading else { return }
-                await model.loadMore()
-            }
         }
         .overlay {
             if model.albums.isEmpty {
@@ -215,7 +166,7 @@ struct CategoryView: View {
                         description: Text("换个关键词或分类试试")
                     )
                 }
-            } else if visibleAlbums.isEmpty {
+            } else if albums.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "line.3.horizontal.decrease.circle")
                         .font(.largeTitle)
@@ -240,29 +191,6 @@ struct CategoryView: View {
     private var visibleAlbums: [HomeAlbum] {
         model.albums.filter { album in
             album.matches(language: selectedLanguage)
-        }
-    }
-
-    @ViewBuilder
-    private var footer: some View {
-        if !model.albums.isEmpty {
-            HStack {
-                Spacer()
-                if model.isLoading {
-                    ProgressView()
-                } else if model.error != nil {
-                    Text("加载失败，继续下滑重试")
-                        .foregroundStyle(.orange)
-                } else if model.hasMore {
-                    Text("继续下滑加载更多")
-                } else {
-                    Text("已经到底了")
-                }
-                Spacer()
-            }
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .padding(.top, 8)
         }
     }
 
