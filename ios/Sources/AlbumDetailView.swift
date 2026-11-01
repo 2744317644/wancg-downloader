@@ -302,8 +302,7 @@ struct AlbumDetailView: View {
                         NavigationLink {
                             CategoryView(
                                 title: "标签：\(tag)",
-                                startURL: searchURL,
-                                appliesLanguageFilter: false
+                                startURL: searchURL
                             )
                         } label: {
                             tagChip(tag)
