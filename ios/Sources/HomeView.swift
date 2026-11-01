@@ -9,9 +9,12 @@ final class HomeFeedModel: ObservableObject {
 
     private var client: WnacgClient?
     private var loaded = false
+    private var generation = 0
 
     func load(force: Bool = false) async {
-        if isLoading || (loaded && !force) { return }
+        if !force && (isLoading || loaded) { return }
+        generation += 1
+        let current = generation
         isLoading = true
         error = nil
         do {
@@ -20,15 +23,19 @@ final class HomeFeedModel: ObservableObject {
             let html = try await client.fetchHTML(
                 URL(string: "https://www.wnacg.com/")!
             )
+            guard current == generation else { return }
             sections = HomeParser.parse(html)
             loaded = true
             if sections.isEmpty {
                 error = "首页没有解析到作品，可能站点结构变了"
             }
         } catch let err {
+            guard current == generation else { return }
             error = err.localizedDescription
         }
-        isLoading = false
+        if current == generation {
+            isLoading = false
+        }
     }
 }
 
@@ -86,6 +93,22 @@ struct HomeView: View {
                         categoryChips
                         ForEach(model.sections) { section in
                             sectionView(section)
+                        }
+                        if let error = model.error {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wifi.exclamationmark")
+                                    .foregroundStyle(.orange)
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                Spacer(minLength: 0)
+                                Button("重试") {
+                                    Task { await model.load(force: true) }
+                                }
+                                .font(.caption2)
+                            }
+                            .padding(.vertical, 4)
                         }
                         footer
                     }
