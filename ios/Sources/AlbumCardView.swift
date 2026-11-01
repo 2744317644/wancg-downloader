@@ -56,9 +56,11 @@ struct HomeCover: View {
         )
         .task(id: album.coverURL) {
             guard let coverURL = album.coverURL else { return }
-            image = await CoverImageStore.shared.image(
+            let loaded = await CoverImageStore.shared.image(
                 for: coverURL, referer: album.pageURL
             )
+            guard !Task.isCancelled else { return }
+            image = loaded
         }
     }
 }
