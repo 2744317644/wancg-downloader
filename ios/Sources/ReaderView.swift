@@ -107,7 +107,7 @@ final class ReaderImageStore {
             return await existing.value
         }
 
-        let task = Task { [weak self] in
+        let task: Task<UIImage?, Never> = Task { [weak self] in
             guard let self else { return nil }
             return await self.loadImage(for: url, referer: referer)
         }
