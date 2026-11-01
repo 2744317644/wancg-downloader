@@ -3,7 +3,7 @@ import UIKit
 import ImageIO
 
 private enum ReaderImageDecoder {
-    static let maxPixelSize: CGFloat = 1600
+    static let maxPixelSize: CGFloat = 1200
 
     static func downsample(_ data: Data) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
@@ -110,8 +110,8 @@ final class ReaderImageStore {
     private let maxConcurrentPrefetch = 1
 
     private init() {
-        cache.countLimit = 16
-        cache.totalCostLimit = 140 * 1024 * 1024
+        cache.countLimit = 12
+        cache.totalCostLimit = 84 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -173,6 +173,8 @@ final class ReaderImageStore {
         prefetchGeneration += 1
         prefetchQueue.removeAll()
         prefetching.removeAll()
+        inFlight.values.forEach { $0.cancel() }
+        inFlight.removeAll()
         activePrefetch = 0
     }
 
