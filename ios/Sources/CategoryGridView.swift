@@ -5,6 +5,8 @@ struct CategoryGridView: UIViewRepresentable {
     let albums: [HomeAlbum]
     let isLoading: Bool
     let hasMore: Bool
+    let topInset: CGFloat
+    let bottomInset: CGFloat
     let onSelect: (HomeAlbum) -> Void
     let onLoadMore: () -> Void
     let onRefresh: () async -> Void
@@ -25,7 +27,14 @@ struct CategoryGridView: UIViewRepresentable {
             frame: .zero, collectionViewLayout: layout
         )
         collectionView.backgroundColor = .clear
+        collectionView.isOpaque = false
+        collectionView.backgroundView = nil
         collectionView.alwaysBounceVertical = true
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.contentInset = UIEdgeInsets(
+            top: topInset, left: 0, bottom: bottomInset, right: 0
+        )
+        collectionView.scrollIndicatorInsets = collectionView.contentInset
         collectionView.keyboardDismissMode = .onDrag
         collectionView.register(
             AlbumGridCell.self,
@@ -50,6 +59,13 @@ struct CategoryGridView: UIViewRepresentable {
     }
 
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        let insets = UIEdgeInsets(
+            top: topInset, left: 0, bottom: bottomInset, right: 0
+        )
+        if collectionView.contentInset != insets {
+            collectionView.contentInset = insets
+            collectionView.scrollIndicatorInsets = insets
+        }
         context.coordinator.updateClosures(self)
         context.coordinator.isLoading = isLoading
         context.coordinator.hasMore = hasMore
