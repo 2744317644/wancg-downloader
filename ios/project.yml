@@ -104,6 +104,7 @@ targets:
       - path: Sources/HTMLParser.swift
       - path: Sources/HomeParser.swift
       - path: Sources/Models.swift
+      - path: Sources/DownloadFolders.swift
       - path: Sources/ZipExtractor.swift
       - path: TestMain.swift
     dependencies:
