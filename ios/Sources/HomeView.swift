@@ -91,7 +91,7 @@ final class CoverImageStore {
     static let shared = CoverImageStore()
 
     private let cache = NSCache<NSURL, UIImage>()
-    private let limiter = CoverLimiter(limit: 2)
+    private let limiter = CoverLimiter(limit: 3)
     private var client: WnacgClient?
 
     private init() {
