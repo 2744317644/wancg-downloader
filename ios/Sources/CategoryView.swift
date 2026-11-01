@@ -85,7 +85,6 @@ struct CategoryView: View {
     let title: String
     let appliesLanguageFilter: Bool
     @StateObject private var model: CategoryFeedModel
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @State private var selectedAlbum: HomeAlbum?
@@ -102,10 +101,13 @@ struct CategoryView: View {
 
     var body: some View {
         let albums = visibleAlbums
+        let safe = windowSafeInsets
         CategoryGridView(
             albums: albums,
             isLoading: model.isLoading,
             hasMore: model.hasMore,
+            topInset: safe.top + 44,
+            bottomInset: safe.bottom + 56,
             onSelect: { selectedAlbum = $0 },
             onLoadMore: {
                 Task { await model.loadMore() }
@@ -115,6 +117,7 @@ struct CategoryView: View {
             }
         )
         .background(background)
+        .ignoresSafeArea(edges: [.top, .bottom])
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
@@ -188,6 +191,17 @@ struct CategoryView: View {
         return MangaLanguageFilter(rawValue: languageFilter) ?? .all
     }
 
+    private var windowSafeInsets: UIEdgeInsets {
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            if let window = scene.windows.first(where: \.isKeyWindow) {
+                return window.safeAreaInsets
+            }
+        }
+        return .zero
+    }
+
     private var visibleAlbums: [HomeAlbum] {
         model.albums.filter { album in
             album.matches(language: selectedLanguage)
@@ -195,19 +209,7 @@ struct CategoryView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: colorScheme == .dark
-                ? [
-                    Color(red: 0.04, green: 0.06, blue: 0.10),
-                    Color(red: 0.02, green: 0.03, blue: 0.06),
-                ]
-                : [
-                    Color(uiColor: .systemBackground),
-                    Color(uiColor: .secondarySystemBackground),
-                ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
     }
 }
