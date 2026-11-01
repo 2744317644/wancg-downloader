@@ -13,6 +13,7 @@ final class CategoryFeedModel: ObservableObject {
     private var nextURL: URL?
     private var client: WnacgClient?
     private var loaded = false
+    private var generation = 0
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -26,7 +27,7 @@ final class CategoryFeedModel: ObservableObject {
 
     func reload() async {
         loaded = false
-        await load(reset: true)
+        await load(reset: true, force: true)
     }
 
     func loadMore() async {
@@ -34,8 +35,11 @@ final class CategoryFeedModel: ObservableObject {
         await load(reset: false)
     }
 
-    private func load(reset: Bool) async {
-        guard !isLoading else { return }
+    private func load(reset: Bool, force: Bool = false) async {
+        if isLoading && !force { return }
+        generation += 1
+        let current = generation
+
         if reset {
             albums = []
             pageCount = 0
@@ -56,6 +60,7 @@ final class CategoryFeedModel: ObservableObject {
             }
             guard let client else { return }
             let html = try await client.fetchHTML(url)
+            guard current == generation else { return }
             let newAlbums = HomeParser.parseCards(html)
             let existing = Set(albums.map(\.aid))
             albums.append(contentsOf: newAlbums.filter {
@@ -67,9 +72,12 @@ final class CategoryFeedModel: ObservableObject {
             loaded = true
             error = nil
         } catch let err {
+            guard current == generation else { return }
             error = err.localizedDescription
         }
-        isLoading = false
+        if current == generation {
+            isLoading = false
+        }
     }
 }
 
