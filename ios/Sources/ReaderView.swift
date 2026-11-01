@@ -98,6 +98,7 @@ final class ReaderModel: ObservableObject {
 @MainActor
 final class ReaderImageStore {
     static let shared = ReaderImageStore()
+    static let concurrencyKey = "performance.readerConcurrency"
 
     private let cache = NSCache<NSURL, UIImage>()
     private var client: WnacgClient?
@@ -107,11 +108,20 @@ final class ReaderImageStore {
     private var activePrefetch = 0
     private var prefetchGeneration = 0
     private var inFlight: [URL: Task<UIImage?, Never>] = [:]
-    private let maxConcurrentPrefetch = 2
+    private var maxConcurrentPrefetch: Int
 
     private init() {
+        let saved = UserDefaults.standard.object(
+            forKey: Self.concurrencyKey
+        ) as? Int ?? 2
+        maxConcurrentPrefetch = min(4, max(1, saved))
         cache.countLimit = 12
         cache.totalCostLimit = 84 * 1024 * 1024
+    }
+
+    func setConcurrency(_ value: Int) {
+        maxConcurrentPrefetch = min(4, max(1, value))
+        startPrefetch()
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
