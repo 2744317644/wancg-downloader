@@ -91,12 +91,12 @@ final class CoverImageStore {
     static let shared = CoverImageStore()
 
     private let cache = NSCache<NSURL, UIImage>()
-    private let limiter = CoverLimiter(limit: 4)
+    private let limiter = CoverLimiter(limit: 2)
     private var client: WnacgClient?
 
     private init() {
-        cache.countLimit = 240
-        cache.totalCostLimit = 96 * 1024 * 1024
+        cache.countLimit = 120
+        cache.totalCostLimit = 48 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -120,7 +120,7 @@ final class CoverImageStore {
             let data = try await client.imageData(url, referer: referer)
             try Task.checkCancellation()
             let image = await Task.detached(
-                priority: .utility
+                priority: .background
             ) {
                 Self.downsample(data)
             }.value
@@ -141,7 +141,7 @@ final class CoverImageStore {
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: 420,
+            kCGImageSourceThumbnailMaxPixelSize: 360,
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(
             source, 0, options as CFDictionary
