@@ -41,17 +41,18 @@ final class HomeFeedModel: ObservableObject {
 }
 
 private actor CoverLimiter {
-    private var available: Int
+    private var limit: Int
+    private var active = 0
     private var order: [UUID] = []
     private var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
 
     init(limit: Int) {
-        available = limit
+        self.limit = max(1, limit)
     }
 
     func acquire() async throws {
-        if available > 0 {
-            available -= 1
+        if active < limit {
+            active += 1
             return
         }
         let id = UUID()
@@ -66,6 +67,19 @@ private actor CoverLimiter {
         }
     }
 
+    func updateLimit(_ newLimit: Int) {
+        limit = max(1, newLimit)
+        while active < limit {
+            guard let id = order.first else { break }
+            order.removeFirst()
+            guard let continuation = waiters.removeValue(forKey: id) else {
+                continue
+            }
+            active += 1
+            continuation.resume()
+        }
+    }
+
     private func cancel(_ id: UUID) {
         guard let continuation = waiters.removeValue(forKey: id) else {
             return
@@ -77,26 +91,37 @@ private actor CoverLimiter {
     func release() {
         while let id = order.first {
             order.removeFirst()
-            if let continuation = waiters.removeValue(forKey: id) {
-                continuation.resume()
-                return
+            guard let continuation = waiters.removeValue(forKey: id) else {
+                continue
             }
+            continuation.resume()
+            return
         }
-        available += 1
+        active = max(0, active - 1)
     }
 }
 
 @MainActor
 final class CoverImageStore {
     static let shared = CoverImageStore()
+    static let concurrencyKey = "performance.coverConcurrency"
 
     private let cache = NSCache<NSURL, UIImage>()
-    private let limiter = CoverLimiter(limit: 3)
+    private let limiter: CoverLimiter
     private var client: WnacgClient?
 
     private init() {
+        let saved = UserDefaults.standard.object(
+            forKey: Self.concurrencyKey
+        ) as? Int ?? 3
+        limiter = CoverLimiter(limit: saved)
         cache.countLimit = 120
         cache.totalCostLimit = 48 * 1024 * 1024
+    }
+
+    func setConcurrency(_ value: Int) {
+        let clamped = min(6, max(1, value))
+        Task { await limiter.updateLimit(clamped) }
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
