@@ -26,7 +26,7 @@ struct CategoryGridView: UIViewRepresentable {
         let collectionView = UICollectionView(
             frame: .zero, collectionViewLayout: layout
         )
-        collectionView.backgroundColor = .clear
+        collectionView.backgroundColor = .systemGroupedBackground
         collectionView.isOpaque = false
         collectionView.backgroundView = nil
         collectionView.alwaysBounceVertical = true
@@ -125,23 +125,23 @@ struct CategoryGridView: UIViewRepresentable {
                 && albums.count >= 700
                 && oldAlbums.suffix(albums.count).map(\.aid) == albums.map(\.aid)
 
+            if prefixTrim, let collectionView, collectionView.contentOffset.y > 0 {
+                let rows = (removed + 2) / 3
+                let height = itemHeight(for: collectionView) + 14
+                UIView.performWithoutAnimation {
+                    collectionView.contentOffset.y = max(
+                        0,
+                        collectionView.contentOffset.y - CGFloat(rows) * height
+                    )
+                }
+            }
+
             var snapshot = NSDiffableDataSourceSnapshot<Int, HomeAlbum>()
             snapshot.appendSections([0])
             snapshot.appendItems(albums, toSection: 0)
             dataSource.apply(snapshot, animatingDifferences: false) {
                 [weak self] in
-                guard let self, let collectionView = self.collectionView else {
-                    return
-                }
-                if prefixTrim, collectionView.contentOffset.y > 0 {
-                    let rows = (removed + 2) / 3
-                    let height = self.itemHeight(for: collectionView)
-                        + 14
-                    collectionView.contentOffset.y = max(
-                        0, collectionView.contentOffset.y - CGFloat(rows) * height
-                    )
-                }
-                self.checkNeedsMore()
+                self?.checkNeedsMore()
             }
 
             DispatchQueue.main.async { [weak self] in
