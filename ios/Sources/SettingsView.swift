@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage("network.useSystemNetwork") private var useSystemNetwork = false
+    @AppStorage("display.force120") private var force120 = true
 
     var body: some View {
         NavigationStack {
@@ -39,13 +40,18 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("显示") {
-                    HStack {
-                        Text("高刷新率")
-                        Spacer()
-                        Text("已启用")
-                            .foregroundStyle(.secondary)
-                    }
+                Section {
+                    Toggle("锁定 120Hz（ProMotion）", isOn: $force120)
+                        .onChange(of: force120) { _, enabled in
+                            HighRefreshRateController.shared.setEnabled(enabled)
+                        }
+                } header: {
+                    Text("显示")
+                } footer: {
+                    Text(
+                        "开启后会请求 ProMotion 120Hz；"
+                        + "实际帧率仍可能因省电、发热或系统策略降低。"
+                    )
                 }
 
                 Section("关于") {
