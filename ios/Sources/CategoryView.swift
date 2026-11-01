@@ -88,6 +88,7 @@ struct CategoryView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
+    @State private var atBottom = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -105,11 +106,13 @@ struct CategoryView: View {
     }
 
     var body: some View {
+        let albums = visibleAlbums
+        let loadTriggerAids = Set(albums.suffix(3).map(\.aid))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
-                if !visibleAlbums.isEmpty {
+                if !albums.isEmpty {
                     HStack {
-                        Text("\(visibleAlbums.count) 部作品")
+                        Text("\(albums.count) 部作品")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -122,7 +125,7 @@ struct CategoryView: View {
                 }
 
                 LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(visibleAlbums) { album in
+                    ForEach(albums) { album in
                         NavigationLink {
                             AlbumDetailView(album: album)
                         } label: {
@@ -130,7 +133,7 @@ struct CategoryView: View {
                         }
                         .buttonStyle(.plain)
                         .onAppear {
-                            if album.aid == visibleAlbums.last?.aid {
+                            if loadTriggerAids.contains(album.aid) {
                                 Task { await model.loadMore() }
                             }
                         }
@@ -138,6 +141,16 @@ struct CategoryView: View {
                 }
 
                 footer
+
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        atBottom = true
+                        Task { await model.loadMore() }
+                    }
+                    .onDisappear {
+                        atBottom = false
+                    }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
@@ -165,6 +178,14 @@ struct CategoryView: View {
         }
         .task {
             await model.loadIfNeeded()
+        }
+        .onChange(of: model.albums.count) { _, _ in
+            guard atBottom else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard atBottom, !model.isLoading else { return }
+                await model.loadMore()
+            }
         }
         .overlay {
             if model.albums.isEmpty {
@@ -225,35 +246,22 @@ struct CategoryView: View {
     @ViewBuilder
     private var footer: some View {
         if !model.albums.isEmpty {
-            VStack(spacing: 8) {
+            HStack {
+                Spacer()
                 if model.isLoading {
                     ProgressView()
+                } else if model.error != nil {
+                    Text("加载失败，继续下滑重试")
+                        .foregroundStyle(.orange)
                 } else if model.hasMore {
-                    Button {
-                        Task { await model.loadMore() }
-                    } label: {
-                        Label("加载更多", systemImage: "arrow.down")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.mint)
+                    Text("继续下滑加载更多")
                 } else {
                     Text("已经到底了")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
                 }
-
-                Button {
-                    Task { await model.reload() }
-                } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .tint(.mint)
-                .disabled(model.isLoading)
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
             .padding(.top, 8)
         }
     }

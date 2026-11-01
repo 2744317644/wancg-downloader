@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 @MainActor
 final class HomeFeedModel: ObservableObject {
@@ -48,6 +49,7 @@ final class CoverImageStore {
 
     private init() {
         cache.countLimit = 120
+        cache.totalCostLimit = 80 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -56,16 +58,39 @@ final class CoverImageStore {
         }
         do {
             if client == nil {
-                client = try WnacgClient()
+                client = try? WnacgClient()
             }
             guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
-            guard let image = UIImage(data: data) else { return nil }
-            cache.setObject(image, forKey: url as NSURL)
+            guard let image = await Task.detached(
+                priority: .userInitiated
+            ) {
+                Self.downsample(data)
+            }.value else { return nil }
+            let cost = Int(image.size.width * image.size.height * 4)
+            cache.setObject(image, forKey: url as NSURL, cost: cost)
             return image
         } catch {
             return nil
         }
+    }
+
+    private static func downsample(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return UIImage(data: data)
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 520,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source, 0, options as CFDictionary
+        ) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
     }
 }
 
@@ -298,23 +323,11 @@ struct HomeView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 8) {
-            Button {
-                Task { await model.load(force: true) }
-            } label: {
-                Label("刷新", systemImage: "arrow.clockwise")
-                    .font(.caption)
-            }
-            .buttonStyle(.bordered)
-            .tint(.mint)
-            .disabled(model.isLoading)
-
-            Text("仅供个人备份")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 6)
+        Text("仅供个人备份")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 6)
     }
 
     private var background: some View {
