@@ -42,28 +42,47 @@ final class HomeFeedModel: ObservableObject {
 
 private actor CoverLimiter {
     private var available: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var order: [UUID] = []
+    private var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
 
     init(limit: Int) {
         available = limit
     }
 
-    func acquire() async {
+    func acquire() async throws {
         if available > 0 {
             available -= 1
             return
         }
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Void, Error>) in
+                waiters[id] = continuation
+                order.append(id)
+            }
+        } onCancel: {
+            Task { await self.cancel(id) }
         }
     }
 
-    func release() {
-        if waiters.isEmpty {
-            available += 1
-        } else {
-            waiters.removeFirst().resume()
+    private func cancel(_ id: UUID) {
+        guard let continuation = waiters.removeValue(forKey: id) else {
+            return
         }
+        order.removeAll { $0 == id }
+        continuation.resume(throwing: CancellationError())
+    }
+
+    func release() {
+        while let id = order.first {
+            order.removeFirst()
+            if let continuation = waiters.removeValue(forKey: id) {
+                continuation.resume()
+                return
+            }
+        }
+        available += 1
     }
 }
 
@@ -73,7 +92,6 @@ final class CoverImageStore {
 
     private let cache = NSCache<NSURL, UIImage>()
     private let limiter = CoverLimiter(limit: 4)
-    private var inFlight: [URL: Task<UIImage?, Never>] = [:]
     private var client: WnacgClient?
 
     private init() {
@@ -85,35 +103,22 @@ final class CoverImageStore {
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
-        if let existing = inFlight[url] {
-            return await existing.value
-        }
-
-        let task: Task<UIImage?, Never> = Task { [weak self] in
-            guard let self else { return nil }
-            return await self.load(url, referer: referer)
-        }
-        inFlight[url] = task
-        let image = await task.value
-        inFlight[url] = nil
-        return image
-    }
-
-    private func load(_ url: URL, referer: URL) async -> UIImage? {
-        if let cached = cache.object(forKey: url as NSURL) {
-            return cached
-        }
-        await limiter.acquire()
-        defer {
-            Task { await limiter.release() }
-        }
-
         do {
+            try Task.checkCancellation()
+            try await limiter.acquire()
+            defer {
+                Task { await limiter.release() }
+            }
+            try Task.checkCancellation()
+            if let cached = cache.object(forKey: url as NSURL) {
+                return cached
+            }
             if client == nil {
                 client = try? WnacgClient()
             }
             guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
+            try Task.checkCancellation()
             let image = await Task.detached(
                 priority: .utility
             ) {
