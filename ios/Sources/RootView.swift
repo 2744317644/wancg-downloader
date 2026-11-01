@@ -42,27 +42,6 @@ struct RootView: View {
                 tabs
             }
         }
-        .overlay(alignment: .bottom) {
-            if downloadModel.hasActiveDownload || !downloadModel.queue.isEmpty {
-                GeometryReader { proxy in
-                    BottomDownloadProgress(model: downloadModel) {
-                        selection = 1
-                    }
-                    .frame(width: min(proxy.size.width * 0.4, 240))
-                    .position(
-                        x: proxy.size.width / 2,
-                        y: proxy.size.height
-                            - proxy.safeAreaInsets.bottom - 58
-                    )
-                }
-                .transition(.opacity)
-                .allowsHitTesting(false)
-            }
-        }
-        .animation(
-            .snappy(duration: 0.22),
-            value: downloadModel.hasActiveDownload
-        )
     }
 }
 
