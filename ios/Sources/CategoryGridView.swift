@@ -69,6 +69,9 @@ struct CategoryGridView: UIViewRepresentable {
         context.coordinator.updateClosures(self)
         context.coordinator.isLoading = isLoading
         context.coordinator.hasMore = hasMore
+        if !isLoading {
+            context.coordinator.requestingMore = false
+        }
         context.coordinator.apply(albums)
         if !isLoading {
             collectionView.refreshControl?.endRefreshing()
@@ -88,7 +91,8 @@ struct CategoryGridView: UIViewRepresentable {
         var onSelect: (HomeAlbum) -> Void = { _ in }
         var onLoadMore: () -> Void = {}
         var onRefresh: () async -> Void = {}
-        private var lastAIDs: [String] = []
+        var requestingMore = false
+        private var lastKey = ""
 
         func configureDataSource(_ collectionView: UICollectionView) {
             dataSource = UICollectionViewDiffableDataSource<Int, HomeAlbum>(
@@ -111,9 +115,9 @@ struct CategoryGridView: UIViewRepresentable {
 
         func apply(_ albums: [HomeAlbum]) {
             self.albums = albums
-            let aids = albums.map(\.aid)
-            guard aids != lastAIDs else { return }
-            lastAIDs = aids
+            let key = "\(albums.count)|\(albums.first?.aid ?? "")|\(albums.last?.aid ?? "")"
+            guard key != lastKey else { return }
+            lastKey = key
 
             var snapshot = NSDiffableDataSourceSnapshot<Int, HomeAlbum>()
             snapshot.appendSections([0])
@@ -125,6 +129,12 @@ struct CategoryGridView: UIViewRepresentable {
             }
         }
 
+        private func requestMore() {
+            guard !isLoading, hasMore, !requestingMore else { return }
+            requestingMore = true
+            onLoadMore()
+        }
+
         private func checkNeedsMore() {
             guard let collectionView,
                   !isLoading,
@@ -132,7 +142,7 @@ struct CategoryGridView: UIViewRepresentable {
             let visibleHeight = collectionView.bounds.height
             guard visibleHeight > 0 else { return }
             if collectionView.contentSize.height < visibleHeight + 240 {
-                onLoadMore()
+                requestMore()
             }
         }
 
@@ -146,7 +156,7 @@ struct CategoryGridView: UIViewRepresentable {
                 - scrollView.contentOffset.y
                 - scrollView.bounds.height
             if remaining < 360 {
-                onLoadMore()
+                requestMore()
             }
         }
 
@@ -166,7 +176,7 @@ struct CategoryGridView: UIViewRepresentable {
         ) -> CGSize {
             let available = collectionView.bounds.width - 32 - 20
             let width = max(1, available / 3)
-            return CGSize(width: width, height: width * 4 / 3 + 48)
+            return CGSize(width: width, height: width * 4 / 3 + 52)
         }
     }
 }
@@ -198,34 +208,28 @@ private final class AlbumGridCell: UICollectionViewCell {
         metaLabel.numberOfLines = 1
 
         for view in [coverView, titleLabel, metaLabel] {
-            view.translatesAutoresizingMaskIntoConstraints = false
+            view.translatesAutoresizingMaskIntoConstraints = true
             contentView.addSubview(view)
         }
-
-        NSLayoutConstraint.activate([
-            coverView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            coverView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            coverView.heightAnchor.constraint(
-                equalTo: coverView.widthAnchor, multiplier: 4.0 / 3.0
-            ),
-
-            titleLabel.topAnchor.constraint(
-                equalTo: coverView.bottomAnchor, constant: 6
-            ),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-
-            metaLabel.topAnchor.constraint(
-                equalTo: titleLabel.bottomAnchor, constant: 2
-            ),
-            metaLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            metaLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-        ])
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let width = contentView.bounds.width
+        let coverHeight = width * 4 / 3
+        coverView.frame = CGRect(
+            x: 0, y: 0, width: width, height: coverHeight
+        )
+        titleLabel.frame = CGRect(
+            x: 0, y: coverHeight + 6, width: width, height: 30
+        )
+        metaLabel.frame = CGRect(
+            x: 0, y: coverHeight + 38, width: width, height: 12
+        )
     }
 
     override func prepareForReuse() {
