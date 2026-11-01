@@ -4,6 +4,8 @@ struct SettingsView: View {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage("network.useSystemNetwork") private var useSystemNetwork = false
     @AppStorage("display.force120") private var force120 = true
+    @AppStorage("performance.coverConcurrency") private var coverConcurrency = 3
+    @AppStorage("performance.readerConcurrency") private var readerConcurrency = 2
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,33 @@ struct SettingsView: View {
                     Text(
                         "开启后会请求 ProMotion 120Hz；"
                         + "实际帧率仍可能因省电、发热或系统策略降低。"
+                    )
+                }
+
+                Section {
+                    Stepper(
+                        "封面并发 \(coverConcurrency)",
+                        value: $coverConcurrency,
+                        in: 1...6
+                    )
+                    .onChange(of: coverConcurrency) { _, value in
+                        CoverImageStore.shared.setConcurrency(value)
+                    }
+
+                    Stepper(
+                        "阅读器预载并发 \(readerConcurrency)",
+                        value: $readerConcurrency,
+                        in: 1...4
+                    )
+                    .onChange(of: readerConcurrency) { _, value in
+                        ReaderImageStore.shared.setConcurrency(value)
+                    }
+                } header: {
+                    Text("性能")
+                } footer: {
+                    Text(
+                        "调高会更快加载封面/预载图片，但会增加 CPU、内存和 429 风险；"
+                        + "卡顿或限流时调低。"
                     )
                 }
 
