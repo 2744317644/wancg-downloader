@@ -114,15 +114,35 @@ struct CategoryGridView: UIViewRepresentable {
         }
 
         func apply(_ albums: [HomeAlbum]) {
+            let oldAlbums = self.albums
             self.albums = albums
             let key = "\(albums.count)|\(albums.first?.aid ?? "")|\(albums.last?.aid ?? "")"
             guard key != lastKey else { return }
             lastKey = key
 
+            let removed = oldAlbums.count - albums.count
+            let prefixTrim = removed > 0
+                && albums.count >= 700
+                && oldAlbums.suffix(albums.count).map(\.aid) == albums.map(\.aid)
+
             var snapshot = NSDiffableDataSourceSnapshot<Int, HomeAlbum>()
             snapshot.appendSections([0])
             snapshot.appendItems(albums, toSection: 0)
-            dataSource.apply(snapshot, animatingDifferences: false)
+            dataSource.apply(snapshot, animatingDifferences: false) {
+                [weak self] in
+                guard let self, let collectionView = self.collectionView else {
+                    return
+                }
+                if prefixTrim, collectionView.contentOffset.y > 0 {
+                    let rows = (removed + 2) / 3
+                    let height = self.itemHeight(for: collectionView)
+                        + 14
+                    collectionView.contentOffset.y = max(
+                        0, collectionView.contentOffset.y - CGFloat(rows) * height
+                    )
+                }
+                self.checkNeedsMore()
+            }
 
             DispatchQueue.main.async { [weak self] in
                 self?.checkNeedsMore()
@@ -174,9 +194,17 @@ struct CategoryGridView: UIViewRepresentable {
             layout collectionViewLayout: UICollectionViewLayout,
             sizeForItemAt indexPath: IndexPath
         ) -> CGSize {
+            let width = itemWidth(for: collectionView)
+            return CGSize(width: width, height: itemHeight(for: collectionView))
+        }
+
+        private func itemWidth(for collectionView: UICollectionView) -> CGFloat {
             let available = collectionView.bounds.width - 32 - 20
-            let width = max(1, available / 3)
-            return CGSize(width: width, height: width * 4 / 3 + 52)
+            return max(1, available / 3)
+        }
+
+        private func itemHeight(for collectionView: UICollectionView) -> CGFloat {
+            itemWidth(for: collectionView) * 4 / 3 + 52
         }
     }
 }
