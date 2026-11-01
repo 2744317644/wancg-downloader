@@ -107,7 +107,7 @@ final class ReaderImageStore {
     private var activePrefetch = 0
     private var prefetchGeneration = 0
     private var inFlight: [URL: Task<UIImage?, Never>] = [:]
-    private let maxConcurrentPrefetch = 1
+    private let maxConcurrentPrefetch = 2
 
     private init() {
         cache.countLimit = 12
