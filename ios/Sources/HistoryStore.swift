@@ -80,13 +80,17 @@ final class HistoryStore: ObservableObject {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode(
-                  [HistoryEntry].self, from: data
-              ) else {
+        guard let data = UserDefaults.standard.data(forKey: key) else {
             return
         }
-        items = decoded
+        do {
+            items = try JSONDecoder().decode(
+                [HistoryEntry].self, from: data
+            )
+        } catch {
+            UserDefaults.standard.set(data, forKey: key + ".backup")
+            items = []
+        }
     }
 
     private func save() {

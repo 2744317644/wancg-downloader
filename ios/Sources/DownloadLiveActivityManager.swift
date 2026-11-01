@@ -9,6 +9,15 @@ final class DownloadLiveActivityManager {
 
     private init() {}
 
+    /// App 进程被杀后 Activity 可能残留；下次启动时清理。
+    func cleanupOrphaned() {
+        for existing in Activity<DownloadActivityAttributes>.activities {
+            Task {
+                await existing.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
+
     func start(aid: String, title: String) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard activity == nil else {

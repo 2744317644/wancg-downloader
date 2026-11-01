@@ -37,9 +37,10 @@ struct FilesView: View {
 
     private var visibleFiles: [DownloadedFile] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return files }
-        return files.filter {
-            $0.name.localizedCaseInsensitiveContains(query)
+        return files.filter { file in
+            guard !(hideZIP && !file.isPDF) else { return false }
+            guard !query.isEmpty else { return true }
+            return file.name.localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -176,16 +177,16 @@ struct FilesView: View {
         files = urls
             .filter { url in
                 let ext = url.pathExtension.lowercased()
-                guard ext == "zip" || ext == "pdf" else { return false }
-                return !(hideZIP && ext == "zip")
+                return ext == "zip" || ext == "pdf"
             }
             .map(DownloadedFile.init(url:))
             .sorted { $0.date > $1.date }
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            try? FileManager.default.removeItem(at: visibleFiles[index].url)
+        let targets = visibleFiles
+        for index in offsets.sorted(by: >) where targets.indices.contains(index) {
+            try? FileManager.default.removeItem(at: targets[index].url)
         }
         load()
     }

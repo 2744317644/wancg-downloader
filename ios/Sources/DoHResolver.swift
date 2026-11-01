@@ -63,7 +63,14 @@ final class DoHResolver {
         return ips
     }
 
-    private func query(host: String) async throws -> [String] {
+    private func query(
+        host: String,
+        depth: Int = 0,
+        visited: Set<String> = []
+    ) async throws -> [String] {
+        guard depth < 5, !visited.contains(host) else { return [] }
+        var visited = visited
+        visited.insert(host)
         var components = URLComponents(string: "https://doh.pub/dns-query")!
         components.queryItems = [
             URLQueryItem(name: "name", value: host),
@@ -100,7 +107,11 @@ final class DoHResolver {
 
         if ips.isEmpty {
             for cname in cnames.prefix(2) {
-                if let nested = try? await query(host: cname), !nested.isEmpty {
+                if let nested = try? await query(
+                    host: cname,
+                    depth: depth + 1,
+                    visited: visited
+                ), !nested.isEmpty {
                     return nested
                 }
             }

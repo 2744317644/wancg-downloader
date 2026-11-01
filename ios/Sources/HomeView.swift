@@ -133,7 +133,8 @@ struct HomeView: View {
                    let url = HomeParser.searchURL(searchQuery) {
                     CategoryView(
                         title: "搜索：\(searchQuery)",
-                        startURL: url
+                        startURL: url,
+                        appliesLanguageFilter: false
                     )
                 }
             }

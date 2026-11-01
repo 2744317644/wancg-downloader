@@ -51,30 +51,46 @@ final class WnacgClient {
     /// 后台/息屏后本地代理可能已经失效；遇到 310 重启代理，
     /// 遇到 HTTP 429 时按 Retry-After / 指数退避重试。
     private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        var attempt = 0
+        if let startupError = ProxySession.shared.startupError {
+            throw startupError
+        }
+        var rateLimitAttempt = 0
+        var proxyAttempt = 0
 
         while true {
             do {
                 let result = try await session.data(for: request)
                 if let http = result.1 as? HTTPURLResponse,
                    http.statusCode == 429,
-                   attempt < 2 {
-                    let delay = retryDelay(http, attempt: attempt)
-                    attempt += 1
-                    try? await Task.sleep(
-                        nanoseconds: UInt64(delay * 1_000_000_000)
-                    )
+                   rateLimitAttempt < 2 {
+                    let delay = retryDelay(http, attempt: rateLimitAttempt)
+                    rateLimitAttempt += 1
+                    do {
+                        try await Task.sleep(
+                            nanoseconds: UInt64(delay * 1_000_000_000)
+                        )
+                    } catch {
+                        throw error
+                    }
                     continue
                 }
                 return result
             } catch {
-                let code = (error as NSError).code
-                guard code == 310 || code == -310, attempt < 2 else {
+                if Task.isCancelled { throw error }
+                let nsError = error as NSError
+                let code = nsError.code
+                let proxyFailure =
+                    code == 310 || code == -310
+                    || (nsError.domain == NSURLErrorDomain
+                        && [-1001, -1004, -1005, -1009, -1200].contains(code))
+                guard proxyFailure, proxyAttempt < 2 else { throw error }
+                proxyAttempt += 1
+                ProxySession.shared.restart()
+                do {
+                    try await Task.sleep(nanoseconds: 300_000_000)
+                } catch {
                     throw error
                 }
-                attempt += 1
-                ProxySession.shared.restart()
-                try? await Task.sleep(nanoseconds: 300_000_000)
             }
         }
     }
@@ -250,17 +266,26 @@ final class WnacgClient {
             for: .documentDirectory, in: .userDomainMask
         )[0]
         let destination = downloads.appendingPathComponent(info.filename)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try? FileManager.default.removeItem(at: destination)
-        }
+        let partial = destination.appendingPathExtension("part")
+        try? FileManager.default.removeItem(at: partial)
 
         let downloader = FileDownloader()
-        return try await downloader.download(
-            info.zipURL,
-            destination: destination,
-            referer: referer,
-            progress: progress
-        )
+        do {
+            _ = try await downloader.download(
+                info.zipURL,
+                destination: partial,
+                referer: referer,
+                progress: progress
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try? FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.moveItem(at: partial, to: destination)
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: partial)
+            throw error
+        }
     }
 
     private struct Target {
@@ -310,6 +335,8 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
     private var session: URLSession!
     private var request: URLRequest?
     private var retries = 0
+    private var failure: Error?
+    private var downloadTask: URLSessionDownloadTask?
 
     func download(
         _ url: URL,
@@ -338,9 +365,15 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
             configuration: configuration, delegate: self, delegateQueue: nil
         )
 
-        return try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-            session.downloadTask(with: request).resume()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+                let task = session.downloadTask(with: request)
+                self.downloadTask = task
+                task.resume()
+            }
+        } onCancel: {
+            self.downloadTask?.cancel()
         }
     }
 
@@ -363,6 +396,12 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
+        if let http = downloadTask.response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode) {
+            try? FileManager.default.removeItem(at: location)
+            failure = WnacgError.message("下载失败：HTTP \(http.statusCode)")
+            return
+        }
         guard let destination else { return }
         do {
             if FileManager.default.fileExists(atPath: destination.path) {
@@ -372,6 +411,9 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
             finished = destination
         } catch {
             finished = nil
+            failure = WnacgError.message(
+                "下载完成但文件保存失败：\(error.localizedDescription)"
+            )
         }
     }
 
@@ -381,11 +423,14 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         didCompleteWithError error: Error?
     ) {
         session.finishTasksAndInvalidate()
+        downloadTask = nil
         guard let continuation else { return }
         self.continuation = nil
 
         if let error {
             continuation.resume(throwing: error)
+        } else if let failure {
+            continuation.resume(throwing: failure)
         } else if let finished {
             continuation.resume(returning: finished)
         } else {

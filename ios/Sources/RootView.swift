@@ -42,6 +42,15 @@ struct RootView: View {
                 tabs
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .appReturnedFromBackground
+            )
+        ) { _ in
+            if !downloadModel.hasActiveDownload {
+                ProxySession.shared.restart()
+            }
+        }
     }
 }
 

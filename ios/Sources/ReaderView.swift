@@ -90,6 +90,8 @@ final class ReaderImageStore {
     private var prefetching = Set<URL>()
     private var prefetchQueue: [(url: URL, referer: URL)] = []
     private var activePrefetch = 0
+    private var prefetchGeneration = 0
+    private var inFlight: [URL: Task<UIImage?, Never>] = [:]
     private let maxConcurrentPrefetch = 1
 
     private init() {
@@ -98,6 +100,24 @@ final class ReaderImageStore {
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+        if let existing = inFlight[url] {
+            return await existing.value
+        }
+
+        let task = Task { [weak self] in
+            guard let self else { return nil }
+            return await self.loadImage(for: url, referer: referer)
+        }
+        inFlight[url] = task
+        let image = await task.value
+        inFlight[url] = nil
+        return image
+    }
+
+    private func loadImage(for url: URL, referer: URL) async -> UIImage? {
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
@@ -134,6 +154,13 @@ final class ReaderImageStore {
         }.value
     }
 
+    func cancelPrefetch() {
+        prefetchGeneration += 1
+        prefetchQueue.removeAll()
+        prefetching.removeAll()
+        activePrefetch = 0
+    }
+
     /// 预载当前页下面的图片，默认由页面传入后续 10 页。
     func prefetch(_ urls: [URL], referer: URL) {
         for url in urls {
@@ -151,11 +178,14 @@ final class ReaderImageStore {
         while activePrefetch < maxConcurrentPrefetch,
               !prefetchQueue.isEmpty {
             let item = prefetchQueue.removeFirst()
+            let generation = prefetchGeneration
             activePrefetch += 1
             Task { [weak self] in
                 guard let self else { return }
                 try? await Task.sleep(for: .milliseconds(120))
+                guard generation == self.prefetchGeneration else { return }
                 _ = await self.image(for: item.url, referer: item.referer)
+                guard generation == self.prefetchGeneration else { return }
                 self.finishPrefetch(item.url)
             }
         }
@@ -243,6 +273,9 @@ struct ReaderView: View {
         }
         .task {
             await model.load()
+        }
+        .onDisappear {
+            ReaderImageStore.shared.cancelPrefetch()
         }
     }
 }

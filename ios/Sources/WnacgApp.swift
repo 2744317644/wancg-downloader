@@ -1,16 +1,24 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let appReturnedFromBackground = Notification.Name(
+        "wnacg.appReturnedFromBackground"
+    )
+}
+
 @main
 struct WnacgApp: App {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
-    @State private var hasBeenActive = false
 
     init() {
         if !UserDefaults.standard.bool(
             forKey: ProxySession.systemNetworkKey
         ) {
             _ = try? LocalProxy.shared.start()
+        }
+        Task { @MainActor in
+            DownloadLiveActivityManager.shared.cleanupOrphaned()
         }
     }
 
@@ -22,12 +30,11 @@ struct WnacgApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(colorScheme)
-                .onChange(of: scenePhase) { _, phase in
-                    guard phase == .active else { return }
-                    if hasBeenActive {
-                        ProxySession.shared.restart()
-                    } else {
-                        hasBeenActive = true
+                .onChange(of: scenePhase) { old, phase in
+                    if phase == .active && old == .background {
+                        NotificationCenter.default.post(
+                            name: .appReturnedFromBackground, object: nil
+                        )
                     }
                 }
         }

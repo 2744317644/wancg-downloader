@@ -1,7 +1,7 @@
 import Foundation
 
 struct HomeAlbum: Identifiable {
-    let id = UUID()
+    var id: String { aid }
     let aid: String
     let title: String
     let coverURL: URL?
@@ -27,6 +27,7 @@ enum HomeParser {
             in: html
         )
         var sections: [HomeSection] = []
+        var seenTitles = Set<String>()
 
         for block in blocks {
             guard let title = HTMLParser.first(
@@ -34,6 +35,7 @@ enum HomeParser {
             ).map(HTMLParser.clean), !title.isEmpty else {
                 continue
             }
+            guard seenTitles.insert(title).inserted else { continue }
 
             let albums = parseCards(block)
             if albums.isEmpty { continue }

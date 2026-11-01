@@ -10,6 +10,22 @@ final class LocalProxy {
     private(set) var port: UInt16 = 0
     private var started = false
 
+    private static let allowedHosts = [
+        "wnacg.com",
+        "qy0.ru",
+        "wn01.download",
+        "wcdn.date",
+        "doh.pub",
+    ]
+
+    private func isAllowed(host: String, port: UInt16) -> Bool {
+        guard port == 443 else { return false }
+        let name = host.lowercased()
+        return Self.allowedHosts.contains {
+            name == $0 || name.hasSuffix("." + $0)
+        }
+    }
+
     private init() {}
 
     func stop() {
@@ -131,6 +147,10 @@ final class LocalProxy {
         let portText = String(hostPort[hostPort.index(after: colon)...])
         guard let targetPort = UInt16(portText) else {
             sendError(client, "400 Bad Request")
+            return
+        }
+        guard isAllowed(host: host, port: targetPort) else {
+            sendError(client, "403 Forbidden")
             return
         }
 
@@ -262,10 +282,18 @@ final class ProxySession {
     static let shared = ProxySession()
     static let systemNetworkKey = "network.useSystemNetwork"
 
-    private(set) var session: URLSession
+    var session: URLSession {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _session
+        }
+    }
     private(set) var startupError: Error?
     private(set) var proxyPort: UInt16 = 0
     private var useSystemNetwork: Bool
+    private var _session: URLSession
+    private let stateLock = NSLock()
 
     private let restartLock = NSLock()
     private var isRestarting = false
@@ -275,11 +303,17 @@ final class ProxySession {
             forKey: ProxySession.systemNetworkKey
         )
         if useSystemNetwork {
-            session = ProxySession.makeSystemSession()
+            _session = ProxySession.makeSystemSession()
         } else {
-            session = URLSession(configuration: .default)
+            _session = URLSession(configuration: .default)
             rebuild(invalidate: false)
         }
+    }
+
+    private func replaceSession(_ new: URLSession) {
+        stateLock.lock()
+        _session = new
+        stateLock.unlock()
     }
 
     func setUseSystemNetwork(_ enabled: Bool) {
@@ -301,7 +335,7 @@ final class ProxySession {
             LocalProxy.shared.stop()
             proxyPort = 0
             startupError = nil
-            session = ProxySession.makeSystemSession()
+            replaceSession(ProxySession.makeSystemSession())
         } else {
             rebuild(invalidate: false)
         }
@@ -323,7 +357,7 @@ final class ProxySession {
 
         if useSystemNetwork {
             session.invalidateAndCancel()
-            session = ProxySession.makeSystemSession()
+            replaceSession(ProxySession.makeSystemSession())
             startupError = nil
             proxyPort = 0
         } else {
@@ -344,14 +378,14 @@ final class ProxySession {
             let port = try LocalProxy.shared.start()
             proxyPort = port
             startupError = nil
-            session = ProxySession.makeSession(port: port)
+            replaceSession(ProxySession.makeSession(port: port))
         } catch {
             startupError = error
             proxyPort = 0
             let configuration = URLSessionConfiguration.default
             configuration.timeoutIntervalForRequest = 60
             configuration.timeoutIntervalForResource = 1200
-            session = URLSession(configuration: configuration)
+            replaceSession(URLSession(configuration: configuration))
         }
     }
 

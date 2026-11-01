@@ -8,10 +8,7 @@ enum FavoritesExporter {
         let downloaded = items.filter { downloadedAids.contains($0.aid) }
         let pending = items.filter { !downloadedAids.contains($0.aid) }
         let now = Date()
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let name = "wnacg-favorites-\(formatter.string(from: now)).html"
+        let name = "wnacg-favorites.html"
 
         let documents = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask

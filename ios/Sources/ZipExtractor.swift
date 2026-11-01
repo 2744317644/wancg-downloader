@@ -7,20 +7,35 @@ enum ZipExtractor {
         "gif", "bmp", "tif", "tiff",
     ]
 
+    static func validate(_ zipURL: URL) throws {
+        _ = try Archive(url: zipURL, accessMode: .read)
+    }
+
     static func extractImages(from zipURL: URL) throws -> [URL] {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
             .appendingPathComponent("wnacg-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        var succeeded = false
+        defer {
+            if !succeeded {
+                try? fileManager.removeItem(at: root)
+            }
+        }
 
         let archive = try Archive(url: zipURL, accessMode: .read)
         var entries: [Entry] = []
+        var totalBytes: UInt64 = 0
         for entry in archive {
             guard entry.type == .file else { continue }
             let path = entry.path.replacingOccurrences(of: "\\", with: "/")
             if path.contains("__MACOSX") || path.hasPrefix(".") { continue }
             let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
             guard imageExtensions.contains(ext) else { continue }
+            totalBytes += UInt64(entry.uncompressedSize)
+            guard entries.count < 3000, totalBytes < 1_500_000_000 else {
+                throw WnacgError.message("压缩包内容过大，已停止解压")
+            }
             entries.append(entry)
         }
 
@@ -39,6 +54,7 @@ enum ZipExtractor {
                 images.append(destination)
             }
         }
+        succeeded = true
         return images
     }
 

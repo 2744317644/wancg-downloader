@@ -83,6 +83,7 @@ final class CategoryFeedModel: ObservableObject {
 
 struct CategoryView: View {
     let title: String
+    let appliesLanguageFilter: Bool
     @StateObject private var model: CategoryFeedModel
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("manga.languageFilter")
@@ -93,8 +94,13 @@ struct CategoryView: View {
         count: 3
     )
 
-    init(title: String, startURL: URL) {
+    init(
+        title: String,
+        startURL: URL,
+        appliesLanguageFilter: Bool = true
+    ) {
         self.title = title
+        self.appliesLanguageFilter = appliesLanguageFilter
         _model = StateObject(wrappedValue: CategoryFeedModel(startURL: startURL))
     }
 
@@ -206,7 +212,8 @@ struct CategoryView: View {
     }
 
     private var selectedLanguage: MangaLanguageFilter {
-        MangaLanguageFilter(rawValue: languageFilter) ?? .all
+        guard appliesLanguageFilter else { return .all }
+        return MangaLanguageFilter(rawValue: languageFilter) ?? .all
     }
 
     private var visibleAlbums: [HomeAlbum] {

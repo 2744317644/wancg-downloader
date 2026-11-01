@@ -74,13 +74,17 @@ final class FavoritesStore: ObservableObject {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode(
-                  [FavoriteManga].self, from: data
-              ) else {
+        guard let data = UserDefaults.standard.data(forKey: key) else {
             return
         }
-        items = decoded
+        do {
+            items = try JSONDecoder().decode(
+                [FavoriteManga].self, from: data
+            )
+        } catch {
+            UserDefaults.standard.set(data, forKey: key + ".backup")
+            items = []
+        }
     }
 
     private func save() {
@@ -105,6 +109,19 @@ final class DownloadHistory: ObservableObject {
         downloadedAids.contains(aid)
     }
 
+    private func normalizedTitle(_ title: String) -> String {
+        HTMLParser.safeFilename(title).lowercased()
+    }
+
+    private func file(_ url: URL, matches title: String) -> Bool {
+        let name = normalizedTitle(title)
+        guard !name.isEmpty else { return false }
+        let ext = url.pathExtension.lowercased()
+        guard ext == "zip" || ext == "pdf" else { return false }
+        return url.deletingPathExtension().lastPathComponent
+            .lowercased() == name
+    }
+
     func hasDownloadedFile(matching title: String) -> Bool {
         guard !title.isEmpty else { return false }
         let documents = FileManager.default.urls(
@@ -115,15 +132,7 @@ final class DownloadHistory: ObservableObject {
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         ) else { return false }
-        let name = title
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "_")
-        return files.contains { file in
-            let ext = file.pathExtension.lowercased()
-            guard ext == "zip" || ext == "pdf" else { return false }
-            return file.deletingPathExtension().lastPathComponent
-                .contains(name)
-        }
+        return files.contains { file($0, matches: title) }
     }
 
     func markDownloaded(_ aid: String) {
@@ -146,16 +155,7 @@ final class DownloadHistory: ObservableObject {
 
         var changed = false
         for favorite in favorites where !downloadedAids.contains(favorite.aid) {
-            let name = favorite.title
-                .replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: ":", with: "_")
-            let matched = files.contains { file in
-                let ext = file.pathExtension.lowercased()
-                guard ext == "zip" || ext == "pdf" else { return false }
-                return file.deletingPathExtension().lastPathComponent
-                    .contains(name)
-            }
-            if matched {
+            if files.contains(where: { file($0, matches: favorite.title) }) {
                 downloadedAids.insert(favorite.aid)
                 changed = true
             }

@@ -19,6 +19,8 @@ final class AppModel: ObservableObject {
 
     private var client: WnacgClient?
     private let queueKey = "wnacg.downloadQueue.v1"
+    private let inflightKey = "wnacg.downloadInflight.v1"
+    private var inflightItem: QueuedDownload?
     private var didResumeQueue = false
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
@@ -48,6 +50,7 @@ final class AppModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         loadQueue()
+        recoverInflight()
     }
 
     /// App 启动后把上次未开始的任务继续跑起来。
@@ -63,6 +66,29 @@ final class AppModel: ObservableObject {
         UserDefaults.standard.set(data, forKey: queueKey)
     }
 
+    private func setInflight(_ item: QueuedDownload?) {
+        inflightItem = item
+        if let item, let data = try? JSONEncoder().encode(item) {
+            UserDefaults.standard.set(data, forKey: inflightKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: inflightKey)
+        }
+    }
+
+    private func recoverInflight() {
+        guard let data = UserDefaults.standard.data(forKey: inflightKey),
+              let item = try? JSONDecoder().decode(
+                  QueuedDownload.self, from: data
+              ) else {
+            return
+        }
+        UserDefaults.standard.removeObject(forKey: inflightKey)
+        if !queue.contains(where: { $0.aid == item.aid }) {
+            queue.insert(item, at: 0)
+            persistQueue()
+        }
+    }
+
     private func loadQueue() {
         guard let data = UserDefaults.standard.data(forKey: queueKey),
               let saved = try? JSONDecoder().decode(
@@ -73,9 +99,10 @@ final class AppModel: ObservableObject {
         queue = saved
     }
 
-    func parse() async {
+    func parse(value: String? = nil, drainQueue: Bool = true) async {
         guard !isBusy else { return }
-        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = (value ?? input)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else {
             errorMessage = "请先粘贴作品链接"
             return
@@ -107,7 +134,11 @@ final class AppModel: ObservableObject {
                     if let data = try? await client.imageData(
                         coverURL, referer: result.pageURL
                     ), let image = UIImage(data: data) {
-                        await MainActor.run { self.coverImage = image }
+                        await MainActor.run {
+                            if self.preview?.aid == result.aid {
+                                self.coverImage = image
+                            }
+                        }
                     }
                 }
             }
@@ -116,12 +147,15 @@ final class AppModel: ObservableObject {
             status = "解析失败"
         }
         isBusy = false
+        if drainQueue && activeAid == nil {
+            processNext()
+        }
     }
 
     func parseAndDownload() async {
-        await parse()
+        await parse(drainQueue: false)
         guard !isBusy, preview != nil, errorMessage == nil else { return }
-        await download()
+        _ = await download()
     }
 
     func enqueue(album: HomeAlbum) {
@@ -140,18 +174,31 @@ final class AppModel: ObservableObject {
     private func startQueued(_ item: QueuedDownload) {
         let album = item.homeAlbum
         activeAid = item.aid
-        input = album.pageURL.absoluteString
+        setInflight(item)
         Task {
-            await parse()
-            if preview != nil, errorMessage == nil {
-                await download()
-                if activeAid == album.aid {
-                    activeAid = nil
-                    processNext()
-                }
-            } else {
+            await parse(
+                value: album.pageURL.absoluteString,
+                drainQueue: false
+            )
+            guard let preview, errorMessage == nil else {
                 activeAid = nil
+                setInflight(nil)
                 processNext()
+                return
+            }
+            guard preview.aid == album.aid else {
+                queue.insert(item, at: 0)
+                persistQueue()
+                activeAid = nil
+                setInflight(nil)
+                return
+            }
+            let started = await download(expectedAid: album.aid)
+            if !started {
+                queue.insert(item, at: 0)
+                persistQueue()
+                activeAid = nil
+                setInflight(nil)
             }
         }
     }
@@ -165,11 +212,20 @@ final class AppModel: ObservableObject {
 
     func retryCurrentDownload() async {
         guard !isBusy, preview != nil else { return }
-        await download()
+        _ = await download()
     }
 
-    func download() async {
-        guard !isBusy, let preview, let client else { return }
+    @discardableResult
+    func download(expectedAid: String? = nil) async -> Bool {
+        guard !isBusy, let preview, let client else { return false }
+        if let expectedAid, preview.aid != expectedAid {
+            errorMessage = "下载任务被其他操作打断，请重试"
+            return false
+        }
+        if isQueued(preview.aid) {
+            queue.removeAll { $0.aid == preview.aid }
+            persistQueue()
+        }
         activeAid = preview.aid
         isBusy = true
         errorMessage = nil
@@ -206,11 +262,11 @@ final class AppModel: ObservableObject {
                 }
             }
             zipURL = downloaded
+            try ZipExtractor.validate(downloaded)
             downloadProgress = 0.7
             DownloadLiveActivityManager.shared.update(
                 progress: 0.7, status: "正在处理 PDF…"
             )
-            DownloadHistory.shared.markDownloaded(preview.aid)
 
             if makePDF {
                 status = "正在解压图片…"
@@ -226,6 +282,7 @@ final class AppModel: ObservableObject {
                         )
                     }
                 }
+                DownloadHistory.shared.markDownloaded(preview.aid)
                 let base = downloaded.deletingPathExtension().lastPathComponent
                 let documents = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask
@@ -254,6 +311,7 @@ final class AppModel: ObservableObject {
                 pdfProgress = 1
                 status = "完成：ZIP + PDF（\(pages) 页）"
             } else {
+                DownloadHistory.shared.markDownloaded(preview.aid)
                 status = "完成：ZIP"
             }
             downloadProgress = 1
@@ -266,7 +324,11 @@ final class AppModel: ObservableObject {
         }
         isBusy = false
         activeAid = nil
+        if inflightItem?.aid == preview.aid {
+            setInflight(nil)
+        }
         processNext()
+        return true
     }
 
     private func beginBackgroundTask() {

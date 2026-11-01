@@ -115,7 +115,6 @@ struct AlbumDetailView: View {
             }
         }
         .task {
-            history.record(album: album, preview: model.preview)
             await model.load()
             history.record(album: album, preview: model.preview)
         }
