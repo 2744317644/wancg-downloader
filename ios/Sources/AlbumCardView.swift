@@ -42,6 +42,7 @@ struct HomeCover: View {
             if let image {
                 Image(uiImage: image)
                     .resizable()
+                    .interpolation(.low)
                     .scaledToFill()
             } else {
                 Image(systemName: "photo")
