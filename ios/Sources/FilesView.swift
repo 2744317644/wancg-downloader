@@ -162,23 +162,7 @@ struct FilesView: View {
     }
 
     private func load() {
-        let documents = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        let keys: [URLResourceKey] = [.isRegularFileKey]
-        guard let urls = try? FileManager.default.contentsOfDirectory(
-            at: documents,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
-        ) else {
-            files = []
-            return
-        }
-        files = urls
-            .filter { url in
-                let ext = url.pathExtension.lowercased()
-                return ext == "zip" || ext == "pdf"
-            }
+        files = DownloadFolders.allFiles()
             .map(DownloadedFile.init(url:))
             .sorted { $0.date > $1.date }
     }
