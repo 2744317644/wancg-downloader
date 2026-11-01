@@ -278,6 +278,15 @@ struct AlbumDetailView: View {
         }
     }
 
+    private func tagChip(_ tag: String) -> some View {
+        Text(tag)
+            .font(.caption2)
+            .foregroundStyle(Color.primary.opacity(0.85))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(0.06), in: Capsule())
+    }
+
     private var tagGrid: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("标签")
@@ -289,12 +298,20 @@ struct AlbumDetailView: View {
                 spacing: 8
             ) {
                 ForEach(tags, id: \.self) { tag in
-                    Text(tag)
-                        .font(.caption2)
-                        .foregroundStyle(Color.primary.opacity(0.85))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.06), in: Capsule())
+                    if let searchURL = HomeParser.searchURL(tag) {
+                        NavigationLink {
+                            CategoryView(
+                                title: "标签：\(tag)",
+                                startURL: searchURL,
+                                appliesLanguageFilter: false
+                            )
+                        } label: {
+                            tagChip(tag)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        tagChip(tag)
+                    }
                 }
             }
         }
