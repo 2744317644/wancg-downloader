@@ -5,16 +5,9 @@ enum FavoritesExporter {
         items: [FavoriteManga],
         downloadedAids: Set<String>
     ) -> URL? {
-        let downloaded = items.filter { downloadedAids.contains($0.aid) }
-        let pending = items.filter { !downloadedAids.contains($0.aid) }
-        let now = Date()
         let name = "wnacg-favorites.html"
-
-        let documents = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
+        let documents = DownloadFolders.documents
         let output = documents.appendingPathComponent(name)
-        let stamp = Int(now.timeIntervalSince1970)
 
         var lines: [String] = [
             "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
@@ -24,18 +17,19 @@ enum FavoritesExporter {
             "<H1>wnacg 收藏夹</H1>",
             "<DL><p>",
         ]
-        appendFolder(
-            title: "已下载",
-            items: downloaded,
-            stamp: stamp,
-            to: &lines
-        )
-        appendFolder(
-            title: "未下载",
-            items: pending,
-            stamp: stamp,
-            to: &lines
-        )
+
+        for item in items {
+            let isDownloaded = downloadedAids.contains(item.aid)
+            let marker = isDownloaded ? "【已下载】" : "【未下载】"
+            let status = isDownloaded ? "已下载" : "未下载"
+            let added = Int(item.addedAt.timeIntervalSince1970)
+            lines.append(
+                "    <DT><A HREF=\"\(escape(item.pageURL))\""
+                + " ADD_DATE=\"\(added)\" DESCRIPTION=\"\(status)\">"
+                + "\(marker)\(escape(item.title))</A>"
+            )
+        }
+
         lines.append("</DL><p>")
         lines.append("")
 
@@ -47,23 +41,6 @@ enum FavoritesExporter {
         } catch {
             return nil
         }
-    }
-
-    private static func appendFolder(
-        title: String,
-        items: [FavoriteManga],
-        stamp: Int,
-        to lines: inout [String]
-    ) {
-        lines.append("    <DT><H3 ADD_DATE=\"\(stamp)\">\(escape(title)) (\(items.count))</H3>")
-        lines.append("    <DL><p>")
-        for item in items {
-            let added = Int(item.addedAt.timeIntervalSince1970)
-            lines.append(
-                "        <DT><A HREF=\"\(escape(item.pageURL))\" ADD_DATE=\"\(added)\">\(escape(item.title))</A>"
-            )
-        }
-        lines.append("    </DL><p>")
     }
 
     private static func escape(_ value: String) -> String {
