@@ -24,6 +24,7 @@ struct WnacgApp: App {
             _ = try? LocalProxy.shared.start()
         }
         Task { @MainActor in
+            HighRefreshRateController.shared.applySavedSetting()
             DownloadLiveActivityManager.shared.cleanupOrphaned()
         }
     }
