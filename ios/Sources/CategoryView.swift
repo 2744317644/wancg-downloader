@@ -14,6 +14,7 @@ final class CategoryFeedModel: ObservableObject {
     private var client: WnacgClient?
     private var loaded = false
     private var generation = 0
+    private var loadedAids = Set<String>()
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -42,6 +43,7 @@ final class CategoryFeedModel: ObservableObject {
 
         if reset {
             albums = []
+            loadedAids.removeAll(keepingCapacity: false)
             pageCount = 0
             nextURL = startURL
             hasMore = true
@@ -62,10 +64,10 @@ final class CategoryFeedModel: ObservableObject {
             let html = try await client.fetchHTML(url)
             guard current == generation else { return }
             let newAlbums = HomeParser.parseCards(html)
-            let existing = Set(albums.map(\.aid))
-            albums.append(contentsOf: newAlbums.filter {
-                !existing.contains($0.aid)
-            })
+            let unique = newAlbums.filter {
+                loadedAids.insert($0.aid).inserted
+            }
+            albums.append(contentsOf: unique)
             pageCount += 1
             nextURL = HomeParser.nextPageURL(html, current: url)
             hasMore = nextURL != nil
@@ -203,7 +205,8 @@ struct CategoryView: View {
     }
 
     private var visibleAlbums: [HomeAlbum] {
-        model.albums.filter { album in
+        guard selectedLanguage != .all else { return model.albums }
+        return model.albums.filter { album in
             album.matches(language: selectedLanguage)
         }
     }
