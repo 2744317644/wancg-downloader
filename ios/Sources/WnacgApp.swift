@@ -12,6 +12,11 @@ struct WnacgApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        URLCache.shared = URLCache(
+            memoryCapacity: 64 * 1024 * 1024,
+            diskCapacity: 256 * 1024 * 1024,
+            diskPath: "wnacg-url-cache"
+        )
         if !UserDefaults.standard.bool(
             forKey: ProxySession.systemNetworkKey
         ) {
