@@ -62,11 +62,12 @@ final class CoverImageStore {
             }
             guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
-            guard let image = await Task.detached(
+            let image = await Task.detached(
                 priority: .userInitiated
             ) {
                 Self.downsample(data)
-            }.value else { return nil }
+            }.value
+            guard let image else { return nil }
             let cost = Int(image.size.width * image.size.height * 4)
             cache.setObject(image, forKey: url as NSURL, cost: cost)
             return image
