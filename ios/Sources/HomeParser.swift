@@ -1,6 +1,6 @@
 import Foundation
 
-struct HomeAlbum: Identifiable {
+struct HomeAlbum: Identifiable, Hashable {
     var id: String { aid }
     let aid: String
     let title: String
