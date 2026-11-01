@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var downloadModel = AppModel()
     @State private var selection = 0
+    @State private var settingsID = UUID()
 
     var body: some View {
         let tabs = TabView(selection: $selection) {
@@ -23,6 +24,7 @@ struct RootView: View {
                 .tag(3)
 
             SettingsView()
+                .id(settingsID)
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(4)
         }
@@ -49,6 +51,11 @@ struct RootView: View {
         ) { _ in
             if !downloadModel.hasActiveDownload {
                 ProxySession.shared.restart()
+            }
+        }
+        .onChange(of: selection) { _, newValue in
+            if newValue != 4 {
+                settingsID = UUID()
             }
         }
     }

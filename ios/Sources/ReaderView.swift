@@ -35,15 +35,26 @@ final class ReaderModel: ObservableObject {
 
     private var client: WnacgClient?
     private var loaded = false
+    private var generation = 0
 
     init(aid: String, title: String) {
         self.aid = aid
         self.title = title
     }
 
+    func reload() async {
+        loaded = false
+        pageURLs = []
+        ProxySession.shared.restart()
+        await load()
+    }
+
     func load() async {
         guard !loaded else { return }
+        generation += 1
+        let current = generation
         isLoading = true
+        error = nil
         do {
             let client = try WnacgClient()
             self.client = client
@@ -56,6 +67,7 @@ final class ReaderModel: ObservableObject {
             let html = try await client.fetchHTML(
                 itemURL, referer: galleryURL
             )
+            guard current == generation else { return }
             guard let arrayText = HTMLParser.first(
                 "\"page_url\"\\s*:\\s*\\[(.*?)\\]", in: html
             ) else {
@@ -74,9 +86,12 @@ final class ReaderModel: ObservableObject {
             error = nil
             loaded = true
         } catch let err {
+            guard current == generation else { return }
             error = err.localizedDescription
         }
-        isLoading = false
+        if current == generation {
+            isLoading = false
+        }
     }
 }
 
@@ -229,7 +244,10 @@ struct ReaderView: View {
                         pageNumber: index + 1,
                         prefetchURLs: Array(
                             model.pageURLs.dropFirst(index + 1).prefix(10)
-                        )
+                        ),
+                        onReload: {
+                            Task { await model.reload() }
+                        }
                     )
                 }
             }
@@ -246,6 +264,15 @@ struct ReaderView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await model.reload() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(model.isLoading)
             }
         }
         .overlay {
@@ -285,6 +312,7 @@ private struct ReaderPageView: View {
     let referer: URL
     let pageNumber: Int
     let prefetchURLs: [URL]
+    let onReload: () -> Void
 
     @State private var image: UIImage?
     @State private var failed = false
@@ -310,6 +338,12 @@ private struct ReaderPageView: View {
                         attempt += 1
                     }
                     .font(.caption)
+
+                    Button("重新加载") {
+                        onReload()
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: placeholderHeight)

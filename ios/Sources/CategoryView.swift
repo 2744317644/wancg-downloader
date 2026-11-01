@@ -225,21 +225,35 @@ struct CategoryView: View {
     @ViewBuilder
     private var footer: some View {
         if !model.albums.isEmpty {
-            HStack {
-                Spacer()
+            VStack(spacing: 8) {
                 if model.isLoading {
                     ProgressView()
                 } else if model.hasMore {
-                    Text("继续下滑加载更多")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    Button {
+                        Task { await model.loadMore() }
+                    } label: {
+                        Label("加载更多", systemImage: "arrow.down")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.mint)
                 } else {
                     Text("已经到底了")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                Spacer()
+
+                Button {
+                    Task { await model.reload() }
+                } label: {
+                    Label("刷新", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .tint(.mint)
+                .disabled(model.isLoading)
             }
+            .frame(maxWidth: .infinity)
             .padding(.top, 8)
         }
     }

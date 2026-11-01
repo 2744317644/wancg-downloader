@@ -298,11 +298,23 @@ struct HomeView: View {
     }
 
     private var footer: some View {
-        Text("仅供个人备份")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 6)
+        VStack(spacing: 8) {
+            Button {
+                Task { await model.load(force: true) }
+            } label: {
+                Label("刷新", systemImage: "arrow.clockwise")
+                    .font(.caption)
+            }
+            .buttonStyle(.bordered)
+            .tint(.mint)
+            .disabled(model.isLoading)
+
+            Text("仅供个人备份")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
     }
 
     private var background: some View {

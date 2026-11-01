@@ -28,14 +28,15 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: wnacg
-        CFBundleShortVersionString: "1.9.2"
-        CFBundleVersion: "192"
+        CFBundleShortVersionString: "1.9.3"
+        CFBundleVersion: "193"
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UIApplicationSupportsIndirectInputEvents: true
         NSSupportsLiveActivities: true
+        CADisableMinimumFrameDurationOnPhone: true
         NSLocalNetworkUsageDescription: 用于连接本机的下载代理。
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
@@ -52,8 +53,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wancg.downloader
-        MARKETING_VERSION: "1.9.2"
-        CURRENT_PROJECT_VERSION: "192"
+        MARKETING_VERSION: "1.9.3"
+        CURRENT_PROJECT_VERSION: "193"
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO
@@ -78,8 +79,8 @@ targets:
       path: Widgets/Info.plist
       properties:
         CFBundleDisplayName: wnacg 下载
-        CFBundleShortVersionString: "1.9.2"
-        CFBundleVersion: "192"
+        CFBundleShortVersionString: "1.9.3"
+        CFBundleVersion: "193"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

@@ -39,6 +39,15 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("显示") {
+                    HStack {
+                        Text("高刷新率")
+                        Spacer()
+                        Text("已启用")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section("关于") {
                     HStack {
                         Text("版本")
