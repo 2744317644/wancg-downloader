@@ -124,15 +124,9 @@ final class DownloadHistory: ObservableObject {
 
     func hasDownloadedFile(matching title: String) -> Bool {
         guard !title.isEmpty else { return false }
-        let documents = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: documents,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else { return false }
-        return files.contains { file($0, matches: title) }
+        return DownloadFolders.allFiles().contains {
+            file($0, matches: title)
+        }
     }
 
     func markDownloaded(_ aid: String) {
@@ -144,14 +138,7 @@ final class DownloadHistory: ObservableObject {
     /// 老版本下载过的文件没有历史记录，按标题匹配一次本地 ZIP/PDF。
     func reconcile(with favorites: [FavoriteManga]) {
         guard !favorites.isEmpty else { return }
-        let documents = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: documents,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else { return }
+        let files = DownloadFolders.allFiles()
 
         var changed = false
         for favorite in favorites where !downloadedAids.contains(favorite.aid) {
