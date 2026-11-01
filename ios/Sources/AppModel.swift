@@ -284,10 +284,11 @@ final class AppModel: ObservableObject {
                 }
                 DownloadHistory.shared.markDownloaded(preview.aid)
                 let base = downloaded.deletingPathExtension().lastPathComponent
-                let documents = FileManager.default.urls(
-                    for: .documentDirectory, in: .userDomainMask
-                )[0]
-                let output = documents.appendingPathComponent(base + ".pdf")
+                let outputDirectory = DownloadFolders.pdfDirectory
+                try FileManager.default.createDirectory(
+                    at: outputDirectory, withIntermediateDirectories: true
+                )
+                let output = outputDirectory.appendingPathComponent(base + ".pdf")
 
                 status = "正在生成 PDF（共 \(images.count) 页）…"
                 let pages = try await Task.detached(
