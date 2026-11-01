@@ -40,22 +40,74 @@ final class HomeFeedModel: ObservableObject {
     }
 }
 
+private actor CoverLimiter {
+    private var available: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) {
+        available = limit
+    }
+
+    func acquire() async {
+        if available > 0 {
+            available -= 1
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            available += 1
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
 @MainActor
 final class CoverImageStore {
     static let shared = CoverImageStore()
 
     private let cache = NSCache<NSURL, UIImage>()
+    private let limiter = CoverLimiter(limit: 4)
+    private var inFlight: [URL: Task<UIImage?, Never>] = [:]
     private var client: WnacgClient?
 
     private init() {
-        cache.countLimit = 120
-        cache.totalCostLimit = 80 * 1024 * 1024
+        cache.countLimit = 240
+        cache.totalCostLimit = 96 * 1024 * 1024
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
+        if let existing = inFlight[url] {
+            return await existing.value
+        }
+
+        let task: Task<UIImage?, Never> = Task { [weak self] in
+            guard let self else { return nil }
+            return await self.load(url, referer: referer)
+        }
+        inFlight[url] = task
+        let image = await task.value
+        inFlight[url] = nil
+        return image
+    }
+
+    private func load(_ url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+        await limiter.acquire()
+        defer {
+            Task { await limiter.release() }
+        }
+
         do {
             if client == nil {
                 client = try? WnacgClient()
@@ -63,7 +115,7 @@ final class CoverImageStore {
             guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
             let image = await Task.detached(
-                priority: .userInitiated
+                priority: .utility
             ) {
                 Self.downsample(data)
             }.value
@@ -84,7 +136,7 @@ final class CoverImageStore {
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: 520,
+            kCGImageSourceThumbnailMaxPixelSize: 420,
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(
             source, 0, options as CFDictionary
