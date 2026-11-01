@@ -76,7 +76,7 @@ final class CoverImageStore {
         }
     }
 
-    private static func downsample(_ data: Data) -> UIImage? {
+    nonisolated private static func downsample(_ data: Data) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return UIImage(data: data)
         }
