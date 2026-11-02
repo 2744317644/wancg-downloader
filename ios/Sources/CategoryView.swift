@@ -15,8 +15,6 @@ final class CategoryFeedModel: ObservableObject {
     private var loaded = false
     private var generation = 0
     private var loadedAids = Set<String>()
-    private let maxLoadedAlbums = 900
-    private let retainedAlbums = 700
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -70,9 +68,6 @@ final class CategoryFeedModel: ObservableObject {
                 loadedAids.insert($0.aid).inserted
             }
             albums.append(contentsOf: unique)
-            if albums.count > maxLoadedAlbums {
-                albums.removeFirst(albums.count - retainedAlbums)
-            }
             pageCount += 1
             nextURL = HomeParser.nextPageURL(html, current: url)
             hasMore = nextURL != nil
