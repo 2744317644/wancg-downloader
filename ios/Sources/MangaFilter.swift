@@ -33,6 +33,37 @@ extension HomeAlbum {
     func matches(language: MangaLanguageFilter) -> Bool {
         language == .all || self.language == language
     }
+
+    var isAI: Bool {
+        AIContentFilter.matches(title)
+    }
+}
+
+enum AIContentFilter {
+    private static let markers = [
+        "ai生成", "aiイラスト", "aiグラビア", "ai美女", "ai画像",
+        "ai写真", "aiアート", "aiヌード", "aiコスプレ", "aiチャット",
+        "ai着せ替え", "ai绘画", "ai绘图", "ai繪圖", "ai艺术",
+        "ai藝術", "ai作品", "ai漫画", "ai漫畫", "ai插画",
+        "ai插畫", "ai寫真", "ai图集", "ai圖集", "ai art",
+        "ai-art", "ai generated", "ai-generated", "ai girl", "ai model",
+        "生成ai",
+    ]
+
+    private static let tokenRegex = try? NSRegularExpression(
+        pattern: "(^|[\\s\\[\\]【】()（）_-])ai($|[\\s\\[\\]【】()（）_-])",
+        options: [.caseInsensitive]
+    )
+
+    static func matches(_ title: String) -> Bool {
+        let text = title.lowercased()
+        if markers.contains(where: { text.contains($0) }) {
+            return true
+        }
+        guard let tokenRegex else { return false }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return tokenRegex.firstMatch(in: text, range: range) != nil
+    }
 }
 
 struct MangaFilterMenu: View {
