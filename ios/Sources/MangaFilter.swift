@@ -47,7 +47,20 @@ enum AIContentFilter {
         "ai藝術", "ai作品", "ai漫画", "ai漫畫", "ai插画",
         "ai插畫", "ai寫真", "ai图集", "ai圖集", "ai art",
         "ai-art", "ai generated", "ai-generated", "ai girl", "ai model",
-        "生成ai",
+        "生成ai", "ai画像生成", "aiイラスト生成", "ai写真集",
+        "aiヌード写真", "aiエロ", "aiフェラ", "aiセックス",
+        "aiおっぱい", "aiちんこ", "ai彼女", "ai少女", "aiロリ",
+        "ai制服", "ai巨乳", "ai爆乳", "ai裸", "ai全裸", "aiエッチ",
+        "aiセクシー", "aiランジェリー", "ai水着", "ai着エロ",
+        "ai脱衣", "aiポートレート", "aiフォト", "aiモデル",
+        "ai美少女", "ai人妻", "ai痴女", "ai寝取られ", "ai同人",
+        "ai画集", "aiヘアヌード", "ai porn", "ai nude", "ai hentai",
+        "ai waifu", "ai anime", "ai cosplay", "ai gravure",
+        "ai women", "ai woman", "ai image", "ai images", "ai gallery",
+        "ai illustration", "ai图集", "ai图片", "ai圖片", "ai图像",
+        "ai圖像", "ai创作", "ai創作", "ai模特", "ai换脸", "ai換臉",
+        "ai脫衣", "ai裸照", "ai色图", "ai色圖", "ai涩图", "ai澀圖",
+        "ai黄图", "ai黃圖", "ai生成画像", "ai生成圖片",
     ]
 
     private static let tokenRegex = try? NSRegularExpression(
@@ -56,7 +69,10 @@ enum AIContentFilter {
     )
 
     static func matches(_ title: String) -> Bool {
-        let text = title.lowercased()
+        let text = title.folding(
+            options: [.caseInsensitive, .widthInsensitive],
+            locale: .current
+        ).lowercased()
         if markers.contains(where: { text.contains($0) }) {
             return true
         }
