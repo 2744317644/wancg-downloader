@@ -114,53 +114,17 @@ struct CategoryGridView: UIViewRepresentable {
         }
 
         func apply(_ albums: [HomeAlbum]) {
-            let oldAlbums = self.albums
             self.albums = albums
             let key = "\(albums.count)|\(albums.first?.aid ?? "")|\(albums.last?.aid ?? "")"
             guard key != lastKey else { return }
             lastKey = key
-
-            let removed = oldAlbums.count - albums.count
-            let prefixTrim = removed > 0
-                && albums.count >= 700
-                && oldAlbums.suffix(albums.count).map(\.aid) == albums.map(\.aid)
-
-            var transitionOverlay: UIView?
-            if prefixTrim, let collectionView,
-               let snapshot = collectionView.snapshotView(
-                   afterScreenUpdates: false
-               ) {
-                snapshot.frame = collectionView.frame
-                snapshot.isUserInteractionEnabled = false
-                collectionView.superview?.addSubview(snapshot)
-                transitionOverlay = snapshot
-            }
-
-            if prefixTrim, let collectionView, collectionView.contentOffset.y > 0 {
-                let rows = (removed + 2) / 3
-                let height = itemHeight(for: collectionView) + 14
-                UIView.performWithoutAnimation {
-                    collectionView.contentOffset.y = max(
-                        0,
-                        collectionView.contentOffset.y - CGFloat(rows) * height
-                    )
-                }
-            }
 
             var snapshot = NSDiffableDataSourceSnapshot<Int, HomeAlbum>()
             snapshot.appendSections([0])
             snapshot.appendItems(albums, toSection: 0)
             dataSource.apply(snapshot, animatingDifferences: false) {
                 [weak self] in
-                guard let self, let collectionView = self.collectionView else {
-                    transitionOverlay?.removeFromSuperview()
-                    return
-                }
-                DispatchQueue.main.async {
-                    collectionView.layoutIfNeeded()
-                    transitionOverlay?.removeFromSuperview()
-                    self.checkNeedsMore()
-                }
+                self?.checkNeedsMore()
             }
 
             DispatchQueue.main.async { [weak self] in
