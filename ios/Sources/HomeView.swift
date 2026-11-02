@@ -183,6 +183,7 @@ struct HomeView: View {
     @State private var searchQuery = ""
     @State private var showSearch = false
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("content.hideAI") private var hideAI = false
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -199,7 +200,7 @@ struct HomeView: View {
                         errorView(error)
                     } else {
                         categoryChips
-                        ForEach(model.sections) { section in
+                        ForEach(displaySections) { section in
                             sectionView(section)
                         }
                         if let error = model.error {
@@ -272,6 +273,19 @@ struct HomeView: View {
         showSearch = true
     }
 
+    private var displaySections: [HomeSection] {
+        guard hideAI else { return model.sections }
+        return model.sections.compactMap { section in
+            let albums = section.albums.filter { !$0.isAI }
+            guard !albums.isEmpty else { return nil }
+            return HomeSection(
+                title: section.title,
+                albums: albums,
+                moreURL: section.moreURL
+            )
+        }
+    }
+
     private var categoryChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -285,7 +299,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
 
-                ForEach(model.sections) { section in
+                ForEach(displaySections) { section in
                     if let moreURL = section.moreURL {
                         NavigationLink {
                             CategoryView(
