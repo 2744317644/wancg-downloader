@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("display.force120") private var force120 = true
     @AppStorage("performance.coverConcurrency") private var coverConcurrency = 3
     @AppStorage("performance.readerConcurrency") private var readerConcurrency = 2
+    @AppStorage("content.hideAI") private var hideAI = false
 
     var body: some View {
         NavigationStack {
@@ -81,6 +82,14 @@ struct SettingsView: View {
                         "调高会更快加载封面/预载图片，但会增加 CPU、内存和 429 风险；"
                         + "卡顿或限流时调低。"
                     )
+                }
+
+                Section {
+                    Toggle("屏蔽 AI 图集", isOn: $hideAI)
+                } header: {
+                    Text("内容")
+                } footer: {
+                    Text("开启后首页、分类和搜索会隐藏标题中带 AI 标记的作品；收藏和历史不受影响。")
                 }
 
                 Section("关于") {
