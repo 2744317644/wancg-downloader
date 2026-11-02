@@ -43,6 +43,7 @@ struct AlbumDetailView: View {
     @State private var didCopyTitle = false
     @State private var downloadStartedHere = false
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("content.hideAI") private var hideAI = false
     @StateObject private var model: AlbumDetailModel
 
     init(album: HomeAlbum) {
@@ -403,7 +404,7 @@ struct AlbumDetailView: View {
     @ViewBuilder
     private var recommendationsSection: some View {
         let items = (model.preview?.recommendations ?? [])
-            .filter { $0.aid != album.aid }
+            .filter { $0.aid != album.aid && (!hideAI || !$0.isAI) }
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text("看过这本的人也看了")
