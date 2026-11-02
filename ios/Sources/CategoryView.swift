@@ -94,6 +94,7 @@ struct CategoryView: View {
     @StateObject private var model: CategoryFeedModel
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
+    @AppStorage("content.hideAI") private var hideAI = false
     @State private var selectedAlbum: HomeAlbum?
 
     init(
@@ -185,6 +186,7 @@ struct CategoryView: View {
                         .font(.subheadline)
                     Button("清除筛选") {
                         languageFilter = MangaLanguageFilter.all.rawValue
+                        hideAI = false
                     }
                     .buttonStyle(.bordered)
                     .tint(.mint)
@@ -210,10 +212,16 @@ struct CategoryView: View {
     }
 
     private var visibleAlbums: [HomeAlbum] {
-        guard selectedLanguage != .all else { return model.albums }
-        return model.albums.filter { album in
-            album.matches(language: selectedLanguage)
+        let languageFiltered: [HomeAlbum]
+        if selectedLanguage == .all {
+            languageFiltered = model.albums
+        } else {
+            languageFiltered = model.albums.filter {
+                $0.matches(language: selectedLanguage)
+            }
         }
+        guard hideAI else { return languageFiltered }
+        return languageFiltered.filter { !$0.isAI }
     }
 
     private var background: some View {
