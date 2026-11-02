@@ -362,9 +362,6 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Text("\(section.albums.count) 部")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
 
             if section.albums.isEmpty {
