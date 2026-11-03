@@ -3,7 +3,6 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var downloadModel = AppModel()
     @State private var selection = 0
-    @State private var settingsID = UUID()
     @AppStorage("debug.showFPS") private var showFPS = false
 
     var body: some View {
@@ -25,7 +24,6 @@ struct RootView: View {
                 .tag(3)
 
             SettingsView()
-                .id(settingsID)
                 .tabItem { Label("设置", systemImage: "gearshape.fill") }
                 .tag(4)
         }
@@ -53,19 +51,6 @@ struct RootView: View {
             if !downloadModel.hasActiveDownload {
                 ProxySession.shared.restart()
             }
-        }
-        .background {
-            TabBarReselectObserver(
-                onReselect: { index in
-                    if index == 4 {
-                        settingsID = UUID()
-                    }
-                },
-                onSelect: { index in
-                    selection = index
-                }
-            )
-            .frame(width: 0, height: 0)
         }
         .overlay(alignment: .topTrailing) {
             if showFPS {
