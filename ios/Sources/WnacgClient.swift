@@ -260,7 +260,7 @@ final class WnacgClient {
     func download(
         _ info: DownloadInfo,
         referer: URL,
-        progress: @escaping (Double) -> Void
+        progress: @escaping (Double, Int64, Int64) -> Void
     ) async throws -> URL {
         let downloads = DownloadFolders.zipDirectory
         try FileManager.default.createDirectory(
@@ -332,7 +332,7 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
     private var continuation: CheckedContinuation<URL, Error>?
     private var destination: URL?
     private var finished: URL?
-    private var progressHandler: ((Double) -> Void)?
+    private var progressHandler: ((Double, Int64, Int64) -> Void)?
     private var session: URLSession!
     private var request: URLRequest?
     private var retries = 0
@@ -343,7 +343,7 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         _ url: URL,
         destination: URL,
         referer: URL,
-        progress: @escaping (Double) -> Void
+        progress: @escaping (Double, Int64, Int64) -> Void
     ) async throws -> URL {
         self.destination = destination
         progressHandler = progress
@@ -388,7 +388,7 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         guard totalBytesExpectedToWrite > 0 else { return }
         let value = min(1, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
         DispatchQueue.main.async { [progressHandler] in
-            progressHandler?(value)
+            progressHandler?(value, totalBytesWritten, totalBytesExpectedToWrite)
         }
     }
 
