@@ -81,20 +81,3 @@ enum AIContentFilter {
         return tokenRegex.firstMatch(in: text, range: range) != nil
     }
 }
-
-struct MangaFilterMenu: View {
-    @AppStorage("manga.languageFilter")
-    private var language = MangaLanguageFilter.all.rawValue
-
-    var body: some View {
-        Menu {
-            Picker("语言", selection: $language) {
-                ForEach(MangaLanguageFilter.allCases) { filter in
-                    Text(filter.title).tag(filter.rawValue)
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-        }
-    }
-}

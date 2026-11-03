@@ -84,8 +84,11 @@ final class CategoryFeedModel: ObservableObject {
             didLoadOnce = true
         } catch let err {
             guard token == generation else { return }
-            if err is CancellationError { return }
-            error = err.localizedDescription
+            // Cancellation must still fall through to the isLoading reset —
+            // an early return here would leave the feed permanently "busy".
+            if !(err is CancellationError) {
+                error = err.localizedDescription
+            }
         }
 
         if token == generation {
@@ -208,6 +211,27 @@ struct CategoryView: View {
         } else {
             albumGrid
             footer
+            loadMoreSentinel
+        }
+    }
+
+    /// Bottom sentinel, lazily rendered by the LazyVStack only when the user
+    /// gets near the end. `task(id:)` re-arms itself after every fetched page,
+    /// which keeps loading alive when a whole site page is filtered out (the
+    /// old last-cell `onAppear` would stall in that case).
+    @ViewBuilder
+    private var loadMoreSentinel: some View {
+        if model.hasMore {
+            Color.clear
+                .frame(height: 1)
+                .accessibilityHidden(true)
+                // Re-created after every fetched page: if it is still in the
+                // viewport (user is at the bottom, or the page was filtered
+                // out entirely) `onAppear` fires again and the next page is
+                // pulled. Off-screen sentinels stay dormant, so the feed can
+                // never chain-load in the background.
+                .id("load-more-\(model.albums.count)")
+                .onAppear { requestMore() }
         }
     }
 
@@ -220,11 +244,6 @@ struct CategoryView: View {
                     AlbumCardView(album: album)
                 }
                 .buttonStyle(AlbumCardButtonStyle())
-                .onAppear {
-                    if album.id == visibleAlbums.last?.id {
-                        requestMore()
-                    }
-                }
             }
         }
         .padding(.top, 4)
@@ -453,7 +472,7 @@ struct CategoryView: View {
                 in: Capsule()
             )
             .contentShape(Capsule())
-            .padding(.vertical, 3)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -479,7 +498,7 @@ struct CategoryView: View {
                 in: Capsule()
             )
             .contentShape(Capsule())
-            .padding(.vertical, 3)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(hideAI ? .isSelected : [])
