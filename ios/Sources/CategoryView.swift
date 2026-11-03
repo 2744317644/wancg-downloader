@@ -97,6 +97,7 @@ struct CategoryView: View {
     @State private var isLoadingPage = false
     @State private var showJump = false
     @State private var jumpText = ""
+    @State private var controlsCollapsed = false
     private let pageSize = 9
 
     private let columns = Array(
@@ -141,11 +142,10 @@ struct CategoryView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !visibleAlbums.isEmpty {
-                pageBar
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                bottomBar
             }
         }
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
@@ -234,21 +234,40 @@ struct CategoryView: View {
         visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
     }
 
-    private var pageBar: some View {
-        HStack(spacing: 10) {
-            pageArrow(
-                systemName: "chevron.left",
-                enabled: currentPage > 0 && !isLoadingPage
-            ) {
-                goToPage(currentPage - 1)
+    private var bottomBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.snappy(duration: 0.22)) {
+                    controlsCollapsed.toggle()
+                }
+            } label: {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 40, height: 34)
+                    .contentShape(Capsule())
             }
+            .buttonStyle(.plain)
+            .background(Color.primary.opacity(0.06), in: Capsule())
+            .accessibilityLabel(
+                controlsCollapsed ? "展开翻页按钮" : "收起翻页按钮"
+            )
 
             Spacer(minLength: 0)
+
+            if !controlsCollapsed {
+                pageArrow(
+                    systemName: "chevron.left",
+                    enabled: currentPage > 0 && !isLoadingPage
+                ) {
+                    goToPage(currentPage - 1)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
 
             if isLoadingPage {
                 ProgressView()
                     .controlSize(.small)
-                    .frame(minWidth: 118)
+                    .frame(minWidth: 96)
             } else {
                 Button {
                     jumpText = "\(currentPage + 1)"
@@ -263,18 +282,19 @@ struct CategoryView: View {
                             .foregroundStyle(.secondary)
                     }
                     .foregroundStyle(.primary)
-                    .frame(minWidth: 118)
+                    .frame(minWidth: 96)
                 }
                 .buttonStyle(.plain)
             }
 
-            Spacer(minLength: 0)
-
-            pageArrow(
-                systemName: "chevron.right",
-                enabled: canGoNext && !isLoadingPage
-            ) {
-                goToPage(currentPage + 1)
+            if !controlsCollapsed {
+                pageArrow(
+                    systemName: "chevron.right",
+                    enabled: canGoNext && !isLoadingPage
+                ) {
+                    goToPage(currentPage + 1)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
             }
         }
         .padding(7)
@@ -283,7 +303,10 @@ struct CategoryView: View {
             Capsule()
                 .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 4)
+        .animation(.snappy(duration: 0.22), value: controlsCollapsed)
     }
 
     private func pageArrow(
@@ -294,7 +317,7 @@ struct CategoryView: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .semibold))
-                .frame(width: 40, height: 32)
+                .frame(width: 36, height: 32)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
