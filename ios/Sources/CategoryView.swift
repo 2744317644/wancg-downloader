@@ -141,7 +141,7 @@ struct CategoryView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
-        .navigationDestination(item: ) { album in
+        .navigationDestination(item: $selectedAlbum) { album in
             AlbumDetailView(album: album)
         }
         .toolbar {
@@ -157,7 +157,7 @@ struct CategoryView: View {
                         await ensurePageLoaded(0)
                     }
                 } label: {
-                    Image(systemName: arrow.clockwise)
+                    Image(systemName: "arrow.clockwise")
                 }
                 .disabled(model.isLoading)
             }
