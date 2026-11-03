@@ -105,18 +105,22 @@ struct CategoryView: View {
     }
 
     var body: some View {
+        let safe = windowSafeInsets
         BatchGridView(
             albums: visibleAlbums,
             isLoading: false,
             hasMore: model.hasMore,
             datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
             reloadToken: model.resetGeneration,
+            topInset: safe.top + 44,
+            bottomInset: safe.bottom + 56,
             onSelect: { selectedAlbum = $0 },
             onLoadMore: {
                 Task { await model.loadMore() }
             }
         )
         .background(background)
+        .ignoresSafeArea(edges: [.top, .bottom])
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
@@ -183,6 +187,17 @@ struct CategoryView: View {
     private var selectedLanguage: MangaLanguageFilter {
         guard appliesLanguageFilter else { return .all }
         return MangaLanguageFilter(rawValue: languageFilter) ?? .all
+    }
+
+    private var windowSafeInsets: UIEdgeInsets {
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            if let window = scene.windows.first(where: \.isKeyWindow) {
+                return window.safeAreaInsets
+            }
+        }
+        return .zero
     }
 
     private var visibleAlbums: [HomeAlbum] {
