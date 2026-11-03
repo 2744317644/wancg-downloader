@@ -93,8 +93,9 @@ struct CategoryView: View {
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
     @State private var selectedAlbum: HomeAlbum?
-    @State private var currentPage = 0
-    private let pageSize = 9
+    @State private var displayedCount = 0
+    @State private var isLoadingBatch = false
+    private let batchSize = 18
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -112,30 +113,38 @@ struct CategoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(pageItems) { album in
-                        NavigationLink {
-                            AlbumDetailView(album: album)
-                        } label: {
-                            AlbumCardView(album: album)
-                        }
-                        .buttonStyle(.plain)
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(displayedAlbums) { album in
+                    NavigationLink {
+                        AlbumDetailView(album: album)
+                    } label: {
+                        AlbumCardView(album: album)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
-                .id(currentPage)
             }
-            .refreshable {
-                await model.reload()
-                currentPage = 0
-                await ensurePageLoaded(0)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            if isLoadingBatch || (model.isLoading && displayedCount > 0) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("加载中…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 18)
             }
 
-            pageBar
+            Color.clear
+                .frame(height: 1)
+                .onAppear {
+                    loadNextBatchIfNeeded()
+                }
+        }
+        .refreshable {
+            await reloadFirstBatch()
         }
         .background(background)
         .navigationTitle(title)
@@ -151,26 +160,21 @@ struct CategoryView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task {
-                        await model.reload()
-                        currentPage = 0
-                        await ensurePageLoaded(0)
-                    }
+                    Task { await reloadFirstBatch() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(model.isLoading)
+                .disabled(model.isLoading || isLoadingBatch)
             }
         }
-        .task(id: currentPage) {
-            await model.loadIfNeeded()
-            await ensurePageLoaded(currentPage)
+        .task {
+            await loadFirstBatch()
         }
         .onChange(of: languageFilter) { _, _ in
-            currentPage = 0
+            resetBatch()
         }
         .onChange(of: hideAI) { _, _ in
-            currentPage = 0
+            resetBatch()
         }
         .overlay {
             if visibleAlbums.isEmpty {
@@ -186,7 +190,7 @@ struct CategoryView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                         Button("重试") {
-                            Task { await model.reload() }
+                            Task { await reloadFirstBatch() }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.mint)
@@ -212,80 +216,51 @@ struct CategoryView: View {
         }
     }
 
-    private var pageItems: [HomeAlbum] {
-        let start = currentPage * pageSize
-        guard start < visibleAlbums.count else { return [] }
-        let end = min(start + pageSize, visibleAlbums.count)
-        return Array(visibleAlbums[start..<end])
+    private var displayedAlbums: [HomeAlbum] {
+        Array(visibleAlbums.prefix(displayedCount))
     }
 
-    private var canGoNext: Bool {
-        visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
+    private func loadFirstBatch() async {
+        await model.loadIfNeeded()
+        displayedCount = min(batchSize, visibleAlbums.count)
     }
 
-    @ViewBuilder
-    private var pageBar: some View {
-        if !visibleAlbums.isEmpty {
-            HStack(spacing: 12) {
-                Button {
-                    currentPage = max(0, currentPage - 1)
-                } label: {
-                    Label("上一页", systemImage: "chevron.left")
-                }
-                .disabled(currentPage == 0)
+    private func reloadFirstBatch() async {
+        displayedCount = 0
+        isLoadingBatch = false
+        await model.reload()
+        await loadFirstBatch()
+    }
 
-                Spacer()
-
-                if model.isLoading {
-                    ProgressView()
-                } else {
-                    Text("第 \(currentPage + 1) 页")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button {
-                    goNextPage()
-                } label: {
-                    Label("下一页", systemImage: "chevron.right")
-                }
-                .disabled(!canGoNext || model.isLoading)
-            }
-            .font(.caption)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
+    private func resetBatch() {
+        displayedCount = min(batchSize, visibleAlbums.count)
+        if displayedCount < batchSize {
+            loadNextBatchIfNeeded()
         }
     }
 
-    private func goNextPage() {
-        guard !model.isLoading else { return }
-        let next = currentPage + 1
-        Task {
-            await ensurePageLoaded(next)
-            if visibleAlbums.count > next * pageSize {
-                currentPage = next
-            }
-        }
-    }
-
-    private func ensurePageLoaded(_ page: Int) async {
-        let target = (page + 1) * pageSize
-        guard visibleAlbums.count < target else { return }
-        if !model.isLoading {
-            await model.loadIfNeeded()
-        }
-        var attempts = 0
-        while visibleAlbums.count < target,
-              model.hasMore,
+    private func loadNextBatchIfNeeded() {
+        guard !isLoadingBatch,
               !model.isLoading,
-              attempts < 8 {
-            let before = visibleAlbums.count
-            await model.loadMore()
-            attempts += 1
-            if visibleAlbums.count == before { break }
+              model.error == nil,
+              (displayedCount < visibleAlbums.count || model.hasMore) else {
+            return
+        }
+        isLoadingBatch = true
+        Task {
+            let target = displayedCount + batchSize
+            var attempts = 0
+            while visibleAlbums.count < target,
+                  model.hasMore,
+                  !model.isLoading,
+                  attempts < 8 {
+                let before = visibleAlbums.count
+                await model.loadMore()
+                attempts += 1
+                if visibleAlbums.count == before { break }
+            }
+            displayedCount = min(max(target, displayedCount), visibleAlbums.count)
+            isLoadingBatch = false
         }
     }
 
