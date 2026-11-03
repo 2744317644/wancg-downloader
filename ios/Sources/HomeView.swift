@@ -436,7 +436,7 @@ struct HomeView: View {
                     } label: {
                         AlbumCardView(album: album)
                     }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AlbumCardButtonStyle())
                     }
                 }
             }

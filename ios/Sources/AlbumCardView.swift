@@ -23,7 +23,7 @@ struct AlbumCardView: View {
                     Text(album.date)
                 }
             }
-            .font(.system(size: 10))
+            .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
