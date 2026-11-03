@@ -5,6 +5,8 @@ struct CategoryGridView: UIViewRepresentable {
     let albums: [HomeAlbum]
     let isLoading: Bool
     let hasMore: Bool
+    let datasetKey: String
+    let reloadToken: Int
     let topInset: CGFloat
     let bottomInset: CGFloat
     let onSelect: (HomeAlbum) -> Void
@@ -41,6 +43,7 @@ struct CategoryGridView: UIViewRepresentable {
             forCellWithReuseIdentifier: AlbumGridCell.reuseID
         )
         collectionView.delegate = context.coordinator
+        collectionView.dataSource = context.coordinator
 
         let refresh = UIRefreshControl()
         refresh.tintColor = .systemMint
@@ -52,9 +55,10 @@ struct CategoryGridView: UIViewRepresentable {
         collectionView.refreshControl = refresh
 
         context.coordinator.collectionView = collectionView
-        context.coordinator.configureDataSource(collectionView)
         context.coordinator.updateClosures(self)
-        context.coordinator.apply(albums)
+        context.coordinator.apply(
+            albums, datasetKey: datasetKey, reloadToken: reloadToken
+        )
         return collectionView
     }
 
@@ -72,18 +76,17 @@ struct CategoryGridView: UIViewRepresentable {
         if !isLoading {
             context.coordinator.requestingMore = false
         }
-        context.coordinator.apply(albums)
+        context.coordinator.apply(
+            albums, datasetKey: datasetKey, reloadToken: reloadToken
+        )
         if !isLoading {
             collectionView.refreshControl?.endRefreshing()
         }
     }
 
     final class Coordinator: NSObject, UICollectionViewDelegate,
-        UICollectionViewDelegateFlowLayout {
+        UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
         weak var collectionView: UICollectionView?
-        private var dataSource: UICollectionViewDiffableDataSource<
-            Int, HomeAlbum
-        >!
 
         var albums: [HomeAlbum] = []
         var isLoading = false
@@ -92,20 +95,8 @@ struct CategoryGridView: UIViewRepresentable {
         var onLoadMore: () -> Void = {}
         var onRefresh: () async -> Void = {}
         var requestingMore = false
-        private var lastKey = ""
-
-        func configureDataSource(_ collectionView: UICollectionView) {
-            dataSource = UICollectionViewDiffableDataSource<Int, HomeAlbum>(
-                collectionView: collectionView
-            ) { collectionView, indexPath, album in
-                let cell = collectionView.dequeueReusableCell(
-                    withReuseIdentifier: AlbumGridCell.reuseID,
-                    for: indexPath
-                ) as! AlbumGridCell
-                cell.configure(with: album)
-                return cell
-            }
-        }
+        private var datasetKey = ""
+        private var reloadToken = -1
 
         func updateClosures(_ view: CategoryGridView) {
             onSelect = view.onSelect
@@ -113,23 +104,71 @@ struct CategoryGridView: UIViewRepresentable {
             onRefresh = view.onRefresh
         }
 
-        func apply(_ albums: [HomeAlbum]) {
+        func apply(
+            _ albums: [HomeAlbum],
+            datasetKey: String,
+            reloadToken: Int
+        ) {
+            guard let collectionView else { return }
+            let previous = self.albums
+            let reset = datasetKey != self.datasetKey
+                || reloadToken != self.reloadToken
+            self.datasetKey = datasetKey
+            self.reloadToken = reloadToken
             self.albums = albums
-            let key = "\(albums.count)|\(albums.first?.aid ?? "")|\(albums.last?.aid ?? "")"
-            guard key != lastKey else { return }
-            lastKey = key
 
-            var snapshot = NSDiffableDataSourceSnapshot<Int, HomeAlbum>()
-            snapshot.appendSections([0])
-            snapshot.appendItems(albums, toSection: 0)
-            dataSource.apply(snapshot, animatingDifferences: false) {
-                [weak self] in
-                self?.checkNeedsMore()
+            guard reset
+                || albums.count != previous.count
+                || albums.last?.aid != previous.last?.aid else {
+                return
             }
 
-            DispatchQueue.main.async { [weak self] in
-                self?.checkNeedsMore()
+            let isAppend = !previous.isEmpty
+                && albums.count > previous.count
+                && albums[previous.count - 1].aid == previous.last?.aid
+
+            if !reset, isAppend {
+                let paths = (previous.count..<albums.count).map {
+                    IndexPath(item: $0, section: 0)
+                }
+                UIView.performWithoutAnimation {
+                    collectionView.performBatchUpdates {
+                        collectionView.insertItems(at: paths)
+                    } completion: { [weak self] _ in
+                        self?.checkNeedsMore()
+                    }
+                }
+            } else {
+                collectionView.reloadData()
+                DispatchQueue.main.async { [weak self] in
+                    self?.checkNeedsMore()
+                }
             }
+        }
+
+        func numberOfSections(in collectionView: UICollectionView) -> Int {
+            1
+        }
+
+        func collectionView(
+            _ collectionView: UICollectionView,
+            numberOfItemsInSection section: Int
+        ) -> Int {
+            albums.count
+        }
+
+        func collectionView(
+            _ collectionView: UICollectionView,
+            cellForItemAt indexPath: IndexPath
+        ) -> UICollectionViewCell {
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: AlbumGridCell.reuseID,
+                for: indexPath
+            ) as! AlbumGridCell
+            if albums.indices.contains(indexPath.item) {
+                cell.configure(with: albums[indexPath.item])
+            }
+            return cell
         }
 
         private func requestMore() {
