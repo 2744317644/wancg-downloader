@@ -57,10 +57,18 @@ struct HomeCover: View {
         )
         .task(id: album.coverURL) {
             guard let coverURL = album.coverURL else { return }
+            if let cached = CoverImageStore.shared.cachedImage(for: coverURL) {
+                image = cached
+                return
+            }
+            // Avoid starting a burst of image requests while the grid is
+            // still moving; a view that disappears cancels this task.
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled else { return }
             let loaded = await CoverImageStore.shared.image(
                 for: coverURL, referer: album.pageURL
             )
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let loaded else { return }
             image = loaded
         }
     }
