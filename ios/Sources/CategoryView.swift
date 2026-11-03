@@ -97,7 +97,6 @@ struct CategoryView: View {
     @State private var isLoadingPage = false
     @State private var showJump = false
     @State private var jumpText = ""
-    @State private var controlsCollapsed = false
     private let pageSize = 9
 
     private let columns = Array(
@@ -140,12 +139,6 @@ struct CategoryView: View {
         .navigationDestination(item: $selectedAlbum) { album in
             AlbumDetailView(album: album)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !visibleAlbums.isEmpty {
-                bottomBar
-            }
-        }
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
@@ -158,6 +151,12 @@ struct CategoryView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .disabled(model.isLoading || isLoadingPage)
+            }
+
+            ToolbarItem(placement: .bottomBar) {
+                if !visibleAlbums.isEmpty {
+                    pagerToolbar
+                }
             }
         }
         .task {
@@ -234,39 +233,19 @@ struct CategoryView: View {
         visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
     }
 
-    private var bottomBar: some View {
-        HStack(spacing: 8) {
+    private var pagerToolbar: some View {
+        HStack(spacing: 18) {
             Button {
-                withAnimation(.snappy(duration: 0.22)) {
-                    controlsCollapsed.toggle()
-                }
+                goToPage(currentPage - 1)
             } label: {
-                Image(systemName: "house.fill")
+                Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 40, height: 34)
-                    .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                controlsCollapsed ? "展开翻页按钮" : "收起翻页按钮"
-            )
-
-            Spacer(minLength: 0)
-
-            if !controlsCollapsed {
-                pageArrow(
-                    systemName: "chevron.left",
-                    enabled: currentPage > 0 && !isLoadingPage
-                ) {
-                    goToPage(currentPage - 1)
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.85)))
-            }
+            .disabled(currentPage == 0 || isLoadingPage)
 
             if isLoadingPage {
                 ProgressView()
                     .controlSize(.small)
-                    .frame(minWidth: 96)
             } else {
                 Button {
                     jumpText = "\(currentPage + 1)"
@@ -278,48 +257,19 @@ struct CategoryView: View {
                             .monospacedDigit()
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.primary)
-                    .frame(minWidth: 96)
                 }
-                .buttonStyle(.plain)
             }
 
-            if !controlsCollapsed {
-                pageArrow(
-                    systemName: "chevron.right",
-                    enabled: canGoNext && !isLoadingPage
-                ) {
-                    goToPage(currentPage + 1)
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            Button {
+                goToPage(currentPage + 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
             }
+            .disabled(!canGoNext || isLoadingPage)
         }
-        .padding(7)
-        .modifier(CategoryLiquidGlassBar())
-        .padding(.horizontal, 16)
-        .padding(.bottom, 4)
-        .animation(.snappy(duration: 0.22), value: controlsCollapsed)
-    }
-
-    private func pageArrow(
-        systemName: String,
-        enabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 36, height: 32)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .opacity(enabled ? 1 : 0.35)
-        .disabled(!enabled)
-        .accessibilityLabel(
-            systemName == "chevron.left" ? "上一页" : "下一页"
-        )
+        .frame(maxWidth: .infinity)
     }
 
     private func loadFirstPage() async {
@@ -412,22 +362,5 @@ struct CategoryView: View {
     private var background: some View {
         Color(uiColor: .systemGroupedBackground)
             .ignoresSafeArea()
-    }
-}
-
-private struct CategoryLiquidGlassBar: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
-        }
     }
 }
