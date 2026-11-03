@@ -236,9 +236,7 @@ struct CategoryView: View {
     private var floatingBar: some View {
         HStack(spacing: 12) {
             Button {
-                withAnimation(.easeInOut(duration: 0.28)) {
-                    dismiss()
-                }
+                dismiss()
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "house.fill")
