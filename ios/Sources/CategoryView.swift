@@ -28,7 +28,7 @@ final class CategoryFeedModel: ObservableObject {
         await load(reset: true)
     }
 
-    /// Reloads the first site page without clearing the grid until the new
+    /// Replace the first site page without clearing the grid until the new
     /// data actually arrives, so pull-to-refresh never flashes an empty page.
     func refresh() async {
         await load(reset: true, force: true)
@@ -96,6 +96,14 @@ final class CategoryFeedModel: ObservableObject {
 
 // MARK: - Screen
 
+/// Second-level listing screen used by category pages ("同人志", "全部作品",
+/// a home section's 更多) and by search results.
+///
+/// A single continuous, adaptive grid is the model here: the site's page
+/// numbers are only a data cursor and never surface in the UI. That removes
+/// the whole class of bugs the old "9 items per page + floating pager" design
+/// kept producing (wrong page counters, tiny 32pt arrows, a second bottom bar
+/// stacked on the native tab bar, empty pages after filtering, …).
 struct CategoryView: View {
     let title: String
     let appliesLanguageFilter: Bool
@@ -105,14 +113,19 @@ struct CategoryView: View {
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
 
-    @State private var showBackToTop = false
-    @State private var isAutoFilling = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Adaptive columns keep the 3-up iPhone rhythm while using the extra
-    /// width of iPad and landscape instead of blowing up the covers.
-    private let columns = [
-        GridItem(.adaptive(minimum: 104, maximum: 154), spacing: 10),
-    ]
+    @State private var isAutoFilling = false
+    @State private var isRefreshing = false
+
+    private var columns: [GridItem] {
+        let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 160 : 104
+        let maximum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 220 : 154
+        return [
+            GridItem(.adaptive(minimum: minimum, maximum: maximum), spacing: 10),
+        ]
+    }
 
     init(
         title: String,
@@ -127,36 +140,35 @@ struct CategoryView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: 16) {
+                    if appliesLanguageFilter {
+                        filterRow(proxy: proxy)
+                    }
                     content
                 }
-                .background(scrollOffsetReader)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
-            .coordinateSpace(name: "categoryScroll")
-            .onPreferenceChange(CategoryScrollOffsetKey.self) { offset in
-                let shouldShow = offset < -420
-                guard shouldShow != showBackToTop else { return }
-                withAnimation(.snappy(duration: 0.2)) {
-                    showBackToTop = shouldShow
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                filterBar(proxy: proxy)
-            }
             .refreshable {
+                isRefreshing = true
                 await model.refresh()
                 await fillFilteredPages(limit: 3)
+                isRefreshing = false
             }
             .background(background)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .seamlessNavigationBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { @MainActor in
+                            isRefreshing = true
                             await model.refresh()
                             await fillFilteredPages(limit: 3)
+                            isRefreshing = false
                         }
                     } label: {
                         Image(systemName: "arrow.clockwise")
@@ -181,17 +193,15 @@ struct CategoryView: View {
             } else if let error = model.error {
                 fullErrorState(error)
             } else if model.didLoadOnce {
-                emptyState(
-                    title: "这个分类暂时没有作品",
-                    message: "可以返回上一页看看其他分类",
-                    showsClearFilter: false
-                )
+                emptyState
             } else {
                 skeletonGrid
             }
         } else if visibleAlbums.isEmpty {
             if isAutoFilling || model.isLoading {
                 filteringState
+            } else if let error = model.error {
+                filteredErrorState(error)
             } else {
                 filteredEmptyState
             }
@@ -217,9 +227,7 @@ struct CategoryView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.top, 4)
     }
 
     private var skeletonGrid: some View {
@@ -228,8 +236,7 @@ struct CategoryView: View {
                 SkeletonAlbumCard()
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
+        .padding(.top, 4)
         .allowsHitTesting(false)
     }
 
@@ -251,11 +258,11 @@ struct CategoryView: View {
                 .foregroundStyle(.secondary)
             Text("没有符合筛选的作品")
                 .font(.subheadline.weight(.semibold))
-            Text("已加载的作品里没有匹配项，可以继续往后加载或清除筛选")
+            Text("已加载的作品里没有匹配项，可以继续往后加载，或清除筛选")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 24)
             HStack(spacing: 10) {
                 Button("清除筛选") {
                     UISelectionFeedbackGenerator().selectionChanged()
@@ -268,6 +275,7 @@ struct CategoryView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.mint)
                 .foregroundStyle(.black)
+                .controlSize(.large)
 
                 if model.hasMore {
                     Button("继续加载") {
@@ -279,6 +287,7 @@ struct CategoryView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.mint)
+                    .controlSize(.large)
                 }
             }
             .font(.caption)
@@ -287,30 +296,44 @@ struct CategoryView: View {
         .padding(.vertical, 60)
     }
 
-    private func emptyState(
-        title: String,
-        message: String,
-        showsClearFilter: Bool
-    ) -> some View {
+    private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(.secondary)
-            Text(title)
+            Text("这个分类暂时没有作品")
+                .font(.subheadline.weight(.semibold))
+            Text("可以返回上一页看看其他分类")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+
+    private func filteredErrorState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(.orange)
+            Text("加载更多失败")
                 .font(.subheadline.weight(.semibold))
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            if showsClearFilter {
-                Button("清除筛选") {
-                    languageFilter = MangaLanguageFilter.all.rawValue
-                    hideAI = false
-                    Task { await fillFilteredPages(limit: 2) }
+                .lineLimit(3)
+                .padding(.horizontal, 24)
+            Button("重试") {
+                Task { @MainActor in
+                    await fillFilteredPages(limit: 3)
                 }
-                .buttonStyle(.bordered)
-                .tint(.mint)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.mint)
+            .foregroundStyle(.black)
+            .controlSize(.large)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -327,7 +350,7 @@ struct CategoryView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 24)
             Button("重试") {
                 Task { @MainActor in
                     await model.refresh()
@@ -337,6 +360,7 @@ struct CategoryView: View {
             .buttonStyle(.borderedProminent)
             .tint(.mint)
             .foregroundStyle(.black)
+            .controlSize(.large)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 70)
@@ -344,7 +368,7 @@ struct CategoryView: View {
 
     @ViewBuilder
     private var footer: some View {
-        if model.isLoading {
+        if model.isLoading && !isRefreshing {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
@@ -354,77 +378,52 @@ struct CategoryView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
+            .accessibilityLabel("正在加载更多")
         } else if let error = model.error {
-            VStack(spacing: 8) {
-                Text("加载更多失败")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                Button("重试") {
-                    requestMore(force: true)
+            Button {
+                requestMore(force: true)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "wifi.exclamationmark")
+                    Text("加载失败，点击重试")
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-                .buttonStyle(.bordered)
-                .tint(.mint)
-                .controlSize(.small)
+                .font(.caption)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .buttonStyle(.plain)
+            .accessibilityLabel("加载失败，点击重试")
         } else if !model.hasMore {
-            Text("已经到底啦")
+            Text("已经到底了 · 共 \(visibleAlbums.count) 部")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
+                .accessibilityLabel("已经到底了，共 \(visibleAlbums.count) 部作品")
         } else {
-            Color.clear.frame(height: 24)
+            Color.clear.frame(height: 20)
         }
     }
 
-    // MARK: Filter bar
+    // MARK: Filter chips
 
-    private func filterBar(proxy: ScrollViewProxy) -> some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if appliesLanguageFilter {
-                        ForEach(MangaLanguageFilter.allCases) { filter in
-                            languagePill(filter, proxy: proxy)
-                        }
-                    }
-                    aiPill(proxy: proxy)
+    private func filterRow(proxy: ScrollViewProxy) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(MangaLanguageFilter.allCases) { filter in
+                    languagePill(filter, proxy: proxy)
                 }
-                .padding(.vertical, 5)
+                aiPill(proxy: proxy)
             }
-
-            if showBackToTop {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    scrollToTop(proxy: proxy)
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 34, height: 34)
-                        .background(Color.primary.opacity(0.07), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("回到顶部")
-                .transition(.scale.combined(with: .opacity))
-            }
+            .padding(.vertical, 2)
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 12)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 0.5)
-        }
-        .animation(.snappy(duration: 0.2), value: showBackToTop)
+        .scrollClipDisabled()
     }
 
     private func languagePill(
@@ -438,15 +437,23 @@ struct CategoryView: View {
             languageFilter = filter.rawValue
             applyFilterChange(proxy: proxy)
         } label: {
-            Text(filter.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(selected ? Color.black : Color.primary.opacity(0.82))
-                .padding(.horizontal, 13)
-                .padding(.vertical, 7)
-                .background(
-                    selected ? Color.mint : Color.primary.opacity(0.06),
-                    in: Capsule()
-                )
+            HStack(spacing: 4) {
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                Text(filter.title)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(selected ? Color.black : Color.primary.opacity(0.82))
+            .padding(.horizontal, 13)
+            .padding(.vertical, 8)
+            .background(
+                selected ? Color.mint : Color.primary.opacity(0.06),
+                in: Capsule()
+            )
+            .contentShape(Capsule())
+            .padding(.vertical, 3)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -459,45 +466,42 @@ struct CategoryView: View {
             applyFilterChange(proxy: proxy)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .semibold))
+                Image(systemName: hideAI ? "checkmark" : "sparkles")
+                    .font(.system(size: 9, weight: .bold))
                 Text("屏蔽 AI")
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(hideAI ? Color.black : Color.primary.opacity(0.82))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 8)
             .background(
                 hideAI ? Color.mint : Color.primary.opacity(0.06),
                 in: Capsule()
             )
+            .contentShape(Capsule())
+            .padding(.vertical, 3)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(hideAI ? .isSelected : [])
     }
 
-    // MARK: Scrolling helpers
-
-    private var scrollOffsetReader: some View {
-        GeometryReader { geometry in
-            Color.clear.preference(
-                key: CategoryScrollOffsetKey.self,
-                value: geometry.frame(in: .named("categoryScroll")).minY
-            )
-        }
-    }
-
-    private func scrollToTop(proxy: ScrollViewProxy) {
-        guard let first = visibleAlbums.first else { return }
-        withAnimation(.snappy(duration: 0.32)) {
-            proxy.scrollTo(first.id, anchor: .top)
-        }
-    }
+    // MARK: Helpers
 
     private func applyFilterChange(proxy: ScrollViewProxy) {
         Task { @MainActor in
             await fillFilteredPages(limit: 6)
             scrollToTop(proxy: proxy)
+        }
+    }
+
+    private func scrollToTop(proxy: ScrollViewProxy) {
+        guard let first = visibleAlbums.first else { return }
+        if reduceMotion {
+            proxy.scrollTo(first.id, anchor: .top)
+        } else {
+            withAnimation(.snappy(duration: 0.32)) {
+                proxy.scrollTo(first.id, anchor: .top)
+            }
         }
     }
 
@@ -510,10 +514,13 @@ struct CategoryView: View {
 
     /// Client-side filters can hide a whole fetched page. Keep pulling site
     /// pages (bounded) until at least one match shows up, so the screen never
-    /// presents a false "empty" result.
+    /// presents a false "empty result".
     private func fillFilteredPages(limit: Int) async {
         var attempts = 0
-        while visibleAlbums.isEmpty, model.hasMore, attempts < limit {
+        while visibleAlbums.isEmpty,
+              model.hasMore,
+              model.error == nil,
+              attempts < limit {
             await model.loadMore()
             attempts += 1
         }
@@ -547,14 +554,8 @@ struct CategoryView: View {
 
 // MARK: - Supporting views
 
-private struct CategoryScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 private struct SkeletonAlbumCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dimmed = false
 
     var body: some View {
@@ -573,7 +574,7 @@ private struct SkeletonAlbumCard: View {
         }
         .opacity(dimmed ? 0.55 : 1)
         .onAppear {
-            guard !UIAccessibility.isReduceMotionEnabled else { return }
+            guard !reduceMotion else { return }
             withAnimation(
                 .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
             ) {
