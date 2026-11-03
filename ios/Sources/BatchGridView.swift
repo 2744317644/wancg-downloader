@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Kingfisher
 
 struct BatchGridView: UIViewRepresentable {
     let albums: [HomeAlbum]
@@ -263,7 +264,6 @@ private final class AlbumGridCell: UICollectionViewCell {
     private let titleLabel = UILabel()
     private let metaLabel = UILabel()
     private var album: HomeAlbum?
-    private var task: Task<Void, Never>?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -275,6 +275,7 @@ private final class AlbumGridCell: UICollectionViewCell {
         coverView.layer.cornerRadius = 10
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = UIColor.label.withAlphaComponent(0.05)
+        coverView.kf.indicatorType = .none
 
         titleLabel.font = .systemFont(ofSize: 12)
         titleLabel.textColor = .label
@@ -311,8 +312,7 @@ private final class AlbumGridCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        task?.cancel()
-        task = nil
+        coverView.kf.cancelDownloadTask()
         album = nil
         coverView.image = nil
         titleLabel.text = nil
@@ -333,21 +333,39 @@ private final class AlbumGridCell: UICollectionViewCell {
             bits.append(album.date)
         }
         metaLabel.text = bits.joined(separator: " · ")
+        coverView.kf.cancelDownloadTask()
         coverView.image = nil
-        task?.cancel()
 
         guard let url = album.coverURL else { return }
-        let aid = album.aid
-        task = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 80_000_000)
-            guard !Task.isCancelled else { return }
-            let image = await CoverImageStore.shared.image(
-                for: url, referer: album.pageURL
+        let pageURL = album.pageURL.absoluteString
+        let modifier = AnyModifier { request in
+            var request = request
+            request.setValue(pageURL, forHTTPHeaderField: "Referer")
+            request.setValue(
+                Self.userAgent, forHTTPHeaderField: "User-Agent"
             )
-            guard !Task.isCancelled, self?.album?.aid == aid else { return }
-            self?.coverView.image = image
+            return request
         }
+        coverView.kf.setImage(
+            with: url,
+            options: [
+                .processor(
+                    DownsamplingImageProcessor(
+                        size: CGSize(width: 360, height: 480)
+                    )
+                ),
+                .scaleFactor(UIScreen.main.scale),
+                .backgroundDecode,
+                .requestModifier(modifier),
+                .transition(.fade(0.15)),
+            ]
+        )
     }
+
+    private static let userAgent =
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) " +
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+        "Version/17.0 Mobile/15E148 Safari/604.1"
 }
 
 private final class LoadingFooterView: UICollectionReusableView {
