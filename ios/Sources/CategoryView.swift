@@ -93,6 +93,16 @@ struct CategoryView: View {
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
     @State private var selectedAlbum: HomeAlbum?
+    @State private var currentPage = 0
+    @State private var isLoadingPage = false
+    @State private var showJump = false
+    @State private var jumpText = ""
+    private let pageSize = 9
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 10),
+        count: 3
+    )
 
     init(
         title: String,
@@ -105,27 +115,36 @@ struct CategoryView: View {
     }
 
     var body: some View {
-        let safe = windowSafeInsets
-        BatchGridView(
-            albums: visibleAlbums,
-            isLoading: model.isLoading,
-            hasMore: model.hasMore,
-            datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
-            reloadToken: model.resetGeneration,
-            topInset: safe.top + 44,
-            bottomInset: safe.bottom + 56,
-            onSelect: { selectedAlbum = $0 },
-            onLoadMore: {
-                Task { await model.loadMore() }
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(pageItems) { album in
+                    NavigationLink {
+                        AlbumDetailView(album: album)
+                    } label: {
+                        AlbumCardView(album: album)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-        )
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 18)
+        }
+        .scrollIndicators(.hidden)
+        .id(currentPage)
         .background(background)
-        .ignoresSafeArea(edges: [.top, .bottom])
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
         .navigationDestination(item: $selectedAlbum) { album in
             AlbumDetailView(album: album)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !visibleAlbums.isEmpty {
+                pageBar
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -134,15 +153,31 @@ struct CategoryView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await model.reload() }
+                    Task { await reload() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(model.isLoading)
+                .disabled(model.isLoading || isLoadingPage)
             }
         }
         .task {
-            await model.loadIfNeeded()
+            await loadFirstPage()
+        }
+        .onChange(of: languageFilter) { _, _ in
+            resetToFirstPage()
+        }
+        .onChange(of: hideAI) { _, _ in
+            resetToFirstPage()
+        }
+        .alert("跳转到页", isPresented: $showJump) {
+            TextField("页码", text: $jumpText)
+                .keyboardType(.numberPad)
+            Button("取消", role: .cancel) {}
+            Button("跳转") {
+                jumpToPage()
+            }
+        } message: {
+            Text("当前第 \(currentPage + 1) 页，已加载 \(loadedPageCount) 页")
         }
         .overlay {
             if visibleAlbums.isEmpty {
@@ -158,7 +193,7 @@ struct CategoryView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                         Button("重试") {
-                            Task { await model.reload() }
+                            Task { await reload() }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.mint)
@@ -184,20 +219,164 @@ struct CategoryView: View {
         }
     }
 
+    private var pageItems: [HomeAlbum] {
+        let start = currentPage * pageSize
+        guard start < visibleAlbums.count else { return [] }
+        let end = min(start + pageSize, visibleAlbums.count)
+        return Array(visibleAlbums[start..<end])
+    }
+
+    private var loadedPageCount: Int {
+        max(1, (visibleAlbums.count + pageSize - 1) / pageSize)
+    }
+
+    private var canGoNext: Bool {
+        visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
+    }
+
+    private var pageBar: some View {
+        HStack(spacing: 10) {
+            pageArrow(
+                systemName: "chevron.left",
+                enabled: currentPage > 0 && !isLoadingPage
+            ) {
+                goToPage(currentPage - 1)
+            }
+
+            Spacer(minLength: 0)
+
+            if isLoadingPage {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(minWidth: 118)
+            } else {
+                Button {
+                    jumpText = "\(currentPage + 1)"
+                    showJump = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("第 \(currentPage + 1) 页")
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .foregroundStyle(.primary)
+                    .frame(minWidth: 118)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+
+            pageArrow(
+                systemName: "chevron.right",
+                enabled: canGoNext && !isLoadingPage
+            ) {
+                goToPage(currentPage + 1)
+            }
+        }
+        .padding(7)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+    }
+
+    private func pageArrow(
+        systemName: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 40, height: 32)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(
+            Color.primary.opacity(0.06),
+            in: Capsule()
+        )
+        .opacity(enabled ? 1 : 0.35)
+        .disabled(!enabled)
+        .accessibilityLabel(
+            systemName == "chevron.left" ? "上一页" : "下一页"
+        )
+    }
+
+    private func loadFirstPage() async {
+        guard !isLoadingPage else { return }
+        isLoadingPage = true
+        await model.loadIfNeeded()
+        await fillPage(0)
+        isLoadingPage = false
+    }
+
+    private func resetToFirstPage() {
+        currentPage = 0
+        Task {
+            guard !isLoadingPage else { return }
+            isLoadingPage = true
+            await fillPage(0)
+            isLoadingPage = false
+        }
+    }
+
+    private func reload() async {
+        isLoadingPage = true
+        currentPage = 0
+        await model.reload()
+        await fillPage(0)
+        isLoadingPage = false
+    }
+
+    private func goToPage(_ page: Int) {
+        guard page >= 0, !isLoadingPage else { return }
+        if page * pageSize < visibleAlbums.count {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                currentPage = page
+            }
+            return
+        }
+        Task {
+            isLoadingPage = true
+            await fillPage(page)
+            if visibleAlbums.count > page * pageSize {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    currentPage = page
+                }
+            }
+            isLoadingPage = false
+        }
+    }
+
+    private func jumpToPage() {
+        guard let value = Int(jumpText), value > 0 else { return }
+        goToPage(value - 1)
+    }
+
+    private func fillPage(_ page: Int) async {
+        let target = (page + 1) * pageSize
+        var attempts = 0
+        while visibleAlbums.count < target,
+              model.hasMore,
+              !model.isLoading,
+              attempts < 20 {
+            let before = visibleAlbums.count
+            await model.loadMore()
+            attempts += 1
+            if visibleAlbums.count == before { break }
+        }
+    }
+
     private var selectedLanguage: MangaLanguageFilter {
         guard appliesLanguageFilter else { return .all }
         return MangaLanguageFilter(rawValue: languageFilter) ?? .all
-    }
-
-    private var windowSafeInsets: UIEdgeInsets {
-        let scenes = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-        for scene in scenes {
-            if let window = scene.windows.first(where: \.isKeyWindow) {
-                return window.safeAreaInsets
-            }
-        }
-        return .zero
     }
 
     private var visibleAlbums: [HomeAlbum] {
