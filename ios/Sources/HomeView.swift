@@ -108,6 +108,7 @@ final class CoverImageStore {
 
     private let cache = NSCache<NSURL, UIImage>()
     private let limiter: CoverLimiter
+    private var requests: [URL: Task<UIImage?, Never>] = [:]
     private var client: WnacgClient?
 
     private init() {
@@ -125,6 +126,34 @@ final class CoverImageStore {
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+        if let existing = requests[url] {
+            return await existing.value
+        }
+
+        let task: Task<UIImage?, Never> = Task { [weak self] in
+            guard let self else { return nil }
+            return await self.loadImage(for: url, referer: referer)
+        }
+        requests[url] = task
+        let image = await task.value
+        requests[url] = nil
+        return image
+    }
+
+    func prefetch(for url: URL, referer: URL) {
+        guard cache.object(forKey: url as NSURL) == nil,
+              requests[url] == nil else {
+            return
+        }
+        Task { [weak self] in
+            _ = await self?.image(for: url, referer: referer)
+        }
+    }
+
+    private func loadImage(for url: URL, referer: URL) async -> UIImage? {
         if let cached = cache.object(forKey: url as NSURL) {
             return cached
         }
