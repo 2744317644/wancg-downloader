@@ -28,7 +28,7 @@ struct ProxyCheck {
             let sampleInfo = try await client.downloadInfo(reqID: sample.aid)
             let downloaded = try await client.download(
                 sampleInfo, referer: sample.pageURL
-            ) { _ in }
+            ) { _, _, _ in }
             let attributes = try? FileManager.default.attributesOfItem(
                 atPath: downloaded.path
             )
