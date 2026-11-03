@@ -221,19 +221,8 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .disabled(model.isBusy)
 
-            if model.downloadProgress > 0 {
-                progressRow(
-                    title: "ZIP",
-                    value: model.downloadProgress <= 0.7
-                        ? model.downloadProgress / 0.7
-                        : 1
-                )
-            }
-            if model.makePDF && model.pdfProgress > 0 {
-                progressRow(
-                    title: "PDF",
-                    value: (model.pdfProgress - 0.7) / 0.3
-                )
+            if model.isBusy {
+                downloadProgressCard
             }
 
             if let zipURL = model.zipURL {
@@ -251,18 +240,68 @@ struct ContentView: View {
         }
     }
 
-    private func progressRow(title: String, value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+    private var downloadProgressCard: some View {
+        let generatingPDF = model.pdfProgress > 0
+        let progress = generatingPDF
+            ? min(1, max(0, (model.pdfProgress - 0.7) / 0.3))
+            : min(1, max(0, model.downloadProgress / 0.7))
+        return VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(generatingPDF ? "正在生成 PDF" : model.status)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
                 Spacer()
-                Text("\(Int(max(0, min(1, value)) * 100))%")
+                Text("\(Int(progress * 100))%")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            ProgressView(value: max(0, min(1, value)))
-                .tint(title == "PDF" ? .blue : .mint)
+
+            if progress > 0 || generatingPDF {
+                ProgressView(value: progress)
+                    .tint(.blue)
+                    .scaleEffect(x: 1, y: 1.5, anchor: .center)
+            } else {
+                ProgressView()
+                    .tint(.blue)
+            }
+
+            if !generatingPDF, progress > 0 {
+                HStack(spacing: 6) {
+                    Text("剩余时间 \(etaText)")
+                    Spacer()
+                    Text(speedText)
+                        .foregroundStyle(.blue)
+                }
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundStyle(.secondary)
+            }
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.055))
+        )
+    }
+
+    private var speedText: String {
+        guard model.downloadSpeed > 0 else { return "--" }
+        return ByteCountFormatter.string(
+            fromByteCount: Int64(model.downloadSpeed), countStyle: .file
+        ) + "/s"
+    }
+
+    private var etaText: String {
+        guard let eta = model.downloadETA, eta.isFinite, eta > 0 else {
+            return "--:--"
+        }
+        let total = Int(eta.rounded())
+        if total >= 3600 {
+            return String(
+                format: "%d:%02d:%02d",
+                total / 3600, (total % 3600) / 60, total % 60
+            )
+        }
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     private var statusBar: some View {
