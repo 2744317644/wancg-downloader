@@ -99,6 +99,10 @@ struct CategoryGridView: UIViewRepresentable {
         var requestingMore = false
         private var datasetKey = ""
         private var reloadToken = -1
+        private var isScrolling = false
+        private var pendingAlbums: [HomeAlbum]?
+        private var pendingDatasetKey = ""
+        private var pendingReloadToken = -1
 
         func updateClosures(_ view: CategoryGridView) {
             onSelect = view.onSelect
@@ -111,7 +115,24 @@ struct CategoryGridView: UIViewRepresentable {
             datasetKey: String,
             reloadToken: Int
         ) {
+            pendingAlbums = albums
+            pendingDatasetKey = datasetKey
+            pendingReloadToken = reloadToken
             guard let collectionView else { return }
+            if isScrolling || collectionView.isDragging
+                || collectionView.isDecelerating {
+                return
+            }
+            flushPending()
+        }
+
+        private func flushPending() {
+            guard let collectionView, let albums = pendingAlbums else {
+                return
+            }
+            pendingAlbums = nil
+            let datasetKey = pendingDatasetKey
+            let reloadToken = pendingReloadToken
             let previous = self.albums
             let reset = datasetKey != self.datasetKey
                 || reloadToken != self.reloadToken
@@ -215,6 +236,7 @@ struct CategoryGridView: UIViewRepresentable {
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            isScrolling = true
             CoverImageStore.shared.setScrolling(true)
         }
 
@@ -232,7 +254,9 @@ struct CategoryGridView: UIViewRepresentable {
         }
 
         private func finishScrolling() {
+            isScrolling = false
             CoverImageStore.shared.setScrolling(false)
+            flushPending()
             guard let collectionView else { return }
             for indexPath in collectionView.indexPathsForVisibleItems {
                 (collectionView.cellForItem(at: indexPath) as? AlbumGridCell)?
