@@ -98,6 +98,7 @@ struct CategoryView: View {
     @State private var showJump = false
     @State private var jumpText = ""
     private let pageSize = 9
+    @Environment(\.dismiss) private var dismiss
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -139,6 +140,12 @@ struct CategoryView: View {
         .navigationDestination(item: $selectedAlbum) { album in
             AlbumDetailView(album: album)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !visibleAlbums.isEmpty {
+                floatingBar
+            }
+        }
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
@@ -151,12 +158,6 @@ struct CategoryView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .disabled(model.isLoading || isLoadingPage)
-            }
-
-            ToolbarItem(placement: .bottomBar) {
-                if !visibleAlbums.isEmpty {
-                    pagerToolbar
-                }
             }
         }
         .task {
@@ -233,43 +234,72 @@ struct CategoryView: View {
         visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
     }
 
-    private var pagerToolbar: some View {
-        HStack(spacing: 18) {
+    private var floatingBar: some View {
+        HStack(spacing: 12) {
             Button {
-                goToPage(currentPage - 1)
+                dismiss()
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "house.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 50, height: 50)
+                    .contentShape(Circle())
             }
-            .disabled(currentPage == 0 || isLoadingPage)
+            .buttonStyle(.plain)
+            .modifier(CategoryGlassCircle())
+            .accessibilityLabel("返回首页")
 
-            if isLoadingPage {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
+            Spacer(minLength: 0)
+
+            HStack(spacing: 4) {
                 Button {
-                    jumpText = "\(currentPage + 1)"
-                    showJump = true
+                    goToPage(currentPage - 1)
                 } label: {
-                    HStack(spacing: 5) {
-                        Text("第 \(currentPage + 1) 页")
-                            .font(.subheadline.weight(.semibold))
-                            .monospacedDigit()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 34, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .disabled(currentPage == 0 || isLoadingPage)
+                .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
+
+                if isLoadingPage {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 82, height: 40)
+                } else {
+                    Button {
+                        jumpText = "\(currentPage + 1)"
+                        showJump = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("第 \(currentPage + 1) 页")
+                                .font(.subheadline.weight(.semibold))
+                                .monospacedDigit()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 8, weight: .semibold))
+                        }
+                        .frame(width: 82, height: 40)
                     }
                 }
-            }
 
-            Button {
-                goToPage(currentPage + 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                Button {
+                    goToPage(currentPage + 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 34, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .disabled(!canGoNext || isLoadingPage)
+                .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
             }
-            .disabled(!canGoNext || isLoadingPage)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .frame(height: 50)
+            .modifier(CategoryGlassCapsule())
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
     }
 
     private func loadFirstPage() async {
@@ -362,5 +392,33 @@ struct CategoryView: View {
     private var background: some View {
         Color(uiColor: .systemGroupedBackground)
             .ignoresSafeArea()
+    }
+}
+
+private struct CategoryGlassCircle: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.16), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        }
+    }
+}
+
+private struct CategoryGlassCapsule: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        }
     }
 }
