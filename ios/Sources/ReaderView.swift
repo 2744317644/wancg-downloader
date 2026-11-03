@@ -235,7 +235,7 @@ struct ReaderView: View {
     let title: String
 
     @StateObject private var model: ReaderModel
-    @State private var visiblePage: Int?
+    @State private var scrollController = ReaderScrollController()
 
     init(aid: String, title: String) {
         self.aid = aid
@@ -248,39 +248,32 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(model.pageURLs.enumerated()), id: \.offset) { index, url in
-                        ReaderPageView(
-                            url: url,
-                            referer: referer,
-                            pageNumber: index + 1,
-                            prefetchURLs: Array(
-                                model.pageURLs.dropFirst(index + 1).prefix(10)
-                            ),
-                            onReload: {
-                                Task { await model.reload() }
-                            }
-                        )
-                        .id(index)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollIndicators(.hidden)
-            .scrollPosition(id: $visiblePage, anchor: .center)
-            .overlay(alignment: .trailing) {
-                if model.pageURLs.count > 1 {
-                    ReaderPageSlider(
-                        current: visiblePage ?? 0,
-                        total: model.pageURLs.count
-                    ) { page in
-                        proxy.scrollTo(page, anchor: .top)
-                    }
-                    .padding(.trailing, 2)
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(model.pageURLs.enumerated()), id: \.offset) { index, url in
+                    ReaderPageView(
+                        url: url,
+                        referer: referer,
+                        pageNumber: index + 1,
+                        prefetchURLs: Array(
+                            model.pageURLs.dropFirst(index + 1).prefix(10)
+                        ),
+                        onReload: {
+                            Task { await model.reload() }
+                        }
+                    )
                 }
             }
+            .background(
+                ReaderScrollObserver(controller: scrollController)
+                    .frame(width: 0, height: 0)
+            )
+        }
+        .scrollIndicators(.hidden)
+        .overlay(alignment: .trailing) {
+            ReaderPageSlider(controller: scrollController)
+                .padding(.trailing, 2)
+                .opacity(model.pageURLs.isEmpty ? 0 : 1)
         }
         .background(Color.black.ignoresSafeArea())
         .navigationTitle(title)
@@ -338,17 +331,15 @@ struct ReaderView: View {
 }
 
 private struct ReaderPageSlider: View {
-    let current: Int
-    let total: Int
-    let onSeek: (Int) -> Void
+    @ObservedObject var controller: ReaderScrollController
 
     var body: some View {
         GeometryReader { geometry in
             let height = max(1, geometry.size.height)
-            let thumbHeight = max(30, height / CGFloat(max(total, 1)))
-            let fraction = total > 1
-                ? CGFloat(current) / CGFloat(total - 1)
-                : 0
+            let visibleFraction = controller.contentHeight > 0
+                ? min(1, controller.viewportHeight / controller.contentHeight)
+                : 1
+            let thumbHeight = max(30, height * visibleFraction)
             let travel = max(0, height - thumbHeight)
 
             ZStack(alignment: .top) {
@@ -360,7 +351,7 @@ private struct ReaderPageSlider: View {
                 Capsule()
                     .fill(Color.white.opacity(0.85))
                     .frame(width: 5, height: thumbHeight)
-                    .offset(y: travel * fraction)
+                    .offset(y: travel * CGFloat(controller.progress))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -370,15 +361,14 @@ private struct ReaderPageSlider: View {
                         let fraction = min(
                             1, max(0, value.location.y / height)
                         )
-                        let page = Int(
-                            (fraction * CGFloat(max(0, total - 1))).rounded()
-                        )
-                        onSeek(page)
+                        controller.seek(to: fraction)
                     }
             )
         }
         .frame(width: 24)
         .padding(.vertical, 8)
+        .opacity(controller.isScrollable ? 1 : 0)
+        .allowsHitTesting(controller.isScrollable)
     }
 }
 
