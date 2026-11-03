@@ -247,7 +247,6 @@ struct CategoryView: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .background(Color.primary.opacity(0.06), in: Capsule())
             .accessibilityLabel(
                 controlsCollapsed ? "展开翻页按钮" : "收起翻页按钮"
             )
@@ -298,12 +297,7 @@ struct CategoryView: View {
             }
         }
         .padding(7)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        .modifier(CategoryLiquidGlassBar())
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
         .animation(.snappy(duration: 0.22), value: controlsCollapsed)
@@ -321,10 +315,6 @@ struct CategoryView: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .background(
-            Color.primary.opacity(0.06),
-            in: Capsule()
-        )
         .opacity(enabled ? 1 : 0.35)
         .disabled(!enabled)
         .accessibilityLabel(
@@ -422,5 +412,22 @@ struct CategoryView: View {
     private var background: some View {
         Color(uiColor: .systemGroupedBackground)
             .ignoresSafeArea()
+    }
+}
+
+private struct CategoryLiquidGlassBar: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        }
     }
 }
