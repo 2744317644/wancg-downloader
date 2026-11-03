@@ -116,38 +116,19 @@ struct CategoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                HStack(spacing: 8) {
-                    Text("\(title) · \(visibleAlbums.count) 部")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 0)
-
-                    HStack(spacing: 4) {
-                        Text("最新更新")
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(pageItems) { album in
+                    NavigationLink {
+                        AlbumDetailView(album: album)
+                    } label: {
+                        AlbumCardView(album: album)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.mint)
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(pageItems) { album in
-                        NavigationLink {
-                            AlbumDetailView(album: album)
-                        } label: {
-                            AlbumCardView(album: album)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 18)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 72)
         }
         .scrollIndicators(.hidden)
         .id(currentPage)
@@ -252,7 +233,7 @@ struct CategoryView: View {
     }
 
     private var floatingBar: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             Button {
                 goToPage(currentPage - 1)
             } label: {
@@ -292,9 +273,10 @@ struct CategoryView: View {
             .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .padding(.bottom, 4)
+        .fixedSize()
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 7)
+        .background(Color(uiColor: .systemGroupedBackground))
         .background {
             Color.clear
                 .contentShape(Rectangle())
