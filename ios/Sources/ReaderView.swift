@@ -236,6 +236,7 @@ struct ReaderView: View {
 
     @StateObject private var model: ReaderModel
     @State private var scrollController = ReaderScrollController()
+    @EnvironmentObject private var chrome: AppChrome
 
     init(aid: String, title: String) {
         self.aid = aid
@@ -324,7 +325,11 @@ struct ReaderView: View {
         .task {
             await model.load()
         }
+        .onAppear {
+            chrome.isBarHidden = true
+        }
         .onDisappear {
+            chrome.isBarHidden = false
             ReaderImageStore.shared.cancelPrefetch()
         }
     }
