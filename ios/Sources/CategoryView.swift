@@ -108,7 +108,7 @@ struct CategoryView: View {
         let safe = windowSafeInsets
         BatchGridView(
             albums: visibleAlbums,
-            isLoading: false,
+            isLoading: model.isLoading,
             hasMore: model.hasMore,
             datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
             reloadToken: model.resetGeneration,
