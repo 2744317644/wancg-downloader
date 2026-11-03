@@ -115,12 +115,25 @@ struct CategoryGridView: UIViewRepresentable {
             datasetKey: String,
             reloadToken: Int
         ) {
+            guard let collectionView else { return }
+
+            let hasPending = pendingAlbums != nil
+            let previous = pendingAlbums ?? self.albums
+            let reset = datasetKey != self.datasetKey
+                || reloadToken != self.reloadToken
+            let isAppend = !hasPending
+                && !reset
+                && !previous.isEmpty
+                && albums.count > previous.count
+                && albums[previous.count - 1].aid == previous.last?.aid
+
             pendingAlbums = albums
             pendingDatasetKey = datasetKey
             pendingReloadToken = reloadToken
-            guard let collectionView else { return }
-            if isScrolling || collectionView.isDragging
-                || collectionView.isDecelerating {
+
+            let scrolling = isScrolling || collectionView.isDragging
+                || collectionView.isDecelerating
+            if scrolling && !isAppend {
                 return
             }
             flushPending()
