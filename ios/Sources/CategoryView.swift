@@ -93,6 +93,13 @@ struct CategoryView: View {
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
     @State private var selectedAlbum: HomeAlbum?
+    @State private var currentPage = 0
+    private let pageSize = 9
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 10),
+        count: 3
+    )
 
     init(
         title: String,
@@ -105,30 +112,36 @@ struct CategoryView: View {
     }
 
     var body: some View {
-        let albums = visibleAlbums
-        let safe = windowSafeInsets
-        CategoryGridView(
-            albums: albums,
-            isLoading: model.isLoading,
-            hasMore: model.hasMore,
-            datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
-            reloadToken: model.resetGeneration,
-            topInset: safe.top + 44,
-            bottomInset: safe.bottom + 56,
-            onSelect: { selectedAlbum = $0 },
-            onLoadMore: {
-                Task { await model.loadMore() }
-            },
-            onRefresh: {
-                await model.reload()
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(pageItems) { album in
+                        NavigationLink {
+                            AlbumDetailView(album: album)
+                        } label: {
+                            AlbumCardView(album: album)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 20)
+                .id(currentPage)
             }
-        )
+            .refreshable {
+                await model.reload()
+                currentPage = 0
+                await ensurePageLoaded(0)
+            }
+
+            pageBar
+        }
         .background(background)
-        .ignoresSafeArea(edges: [.top, .bottom])
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
-        .navigationDestination(item: $selectedAlbum) { album in
+        .navigationDestination(item: ) { album in
             AlbumDetailView(album: album)
         }
         .toolbar {
@@ -138,18 +151,29 @@ struct CategoryView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await model.reload() }
+                    Task {
+                        await model.reload()
+                        currentPage = 0
+                        await ensurePageLoaded(0)
+                    }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: arrow.clockwise)
                 }
                 .disabled(model.isLoading)
             }
         }
-        .task {
+        .task(id: currentPage) {
             await model.loadIfNeeded()
+            await ensurePageLoaded(currentPage)
+        }
+        .onChange(of: languageFilter) { _, _ in
+            currentPage = 0
+        }
+        .onChange(of: hideAI) { _, _ in
+            currentPage = 0
         }
         .overlay {
-            if model.albums.isEmpty {
+            if visibleAlbums.isEmpty {
                 if model.isLoading {
                     ProgressView("正在加载…")
                 } else if let error = model.error {
@@ -170,44 +194,104 @@ struct CategoryView: View {
                     }
                     .padding()
                 } else {
-                    ContentUnavailableView(
-                        "没有找到作品",
-                        systemImage: "magnifyingglass",
-                        description: Text("换个关键词或分类试试")
-                    )
-                }
-            } else if albums.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("本页没有符合筛选的作品")
-                        .font(.subheadline)
-                    Button("清除筛选") {
-                        languageFilter = MangaLanguageFilter.all.rawValue
-                        hideAI = false
+                    VStack(spacing: 10) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text("本页没有符合筛选的作品")
+                            .font(.subheadline)
+                        Button("清除筛选") {
+                            languageFilter = MangaLanguageFilter.all.rawValue
+                            hideAI = false
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.mint)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.mint)
                 }
             }
+        }
+    }
+
+    private var pageItems: [HomeAlbum] {
+        let start = currentPage * pageSize
+        guard start < visibleAlbums.count else { return [] }
+        let end = min(start + pageSize, visibleAlbums.count)
+        return Array(visibleAlbums[start..<end])
+    }
+
+    private var canGoNext: Bool {
+        visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
+    }
+
+    @ViewBuilder
+    private var pageBar: some View {
+        if !visibleAlbums.isEmpty {
+            HStack(spacing: 12) {
+                Button {
+                    currentPage = max(0, currentPage - 1)
+                } label: {
+                    Label("上一页", systemImage: "chevron.left")
+                }
+                .disabled(currentPage == 0)
+
+                Spacer()
+
+                if model.isLoading {
+                    ProgressView()
+                } else {
+                    Text("第 \(currentPage + 1) 页")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    goNextPage()
+                } label: {
+                    Label("下一页", systemImage: "chevron.right")
+                }
+                .disabled(!canGoNext || model.isLoading)
+            }
+            .font(.caption)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    private func goNextPage() {
+        guard !model.isLoading else { return }
+        let next = currentPage + 1
+        Task {
+            await ensurePageLoaded(next)
+            if visibleAlbums.count > next * pageSize {
+                currentPage = next
+            }
+        }
+    }
+
+    private func ensurePageLoaded(_ page: Int) async {
+        let target = (page + 1) * pageSize
+        guard visibleAlbums.count < target else { return }
+        if !model.isLoading {
+            await model.loadIfNeeded()
+        }
+        var attempts = 0
+        while visibleAlbums.count < target,
+              model.hasMore,
+              !model.isLoading,
+              attempts < 8 {
+            let before = visibleAlbums.count
+            await model.loadMore()
+            attempts += 1
+            if visibleAlbums.count == before { break }
         }
     }
 
     private var selectedLanguage: MangaLanguageFilter {
         guard appliesLanguageFilter else { return .all }
         return MangaLanguageFilter(rawValue: languageFilter) ?? .all
-    }
-
-    private var windowSafeInsets: UIEdgeInsets {
-        let scenes = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-        for scene in scenes {
-            if let window = scene.windows.first(where: \.isKeyWindow) {
-                return window.safeAreaInsets
-            }
-        }
-        return .zero
     }
 
     private var visibleAlbums: [HomeAlbum] {
