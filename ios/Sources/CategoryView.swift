@@ -236,13 +236,13 @@ struct CategoryView: View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
 
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 Button {
                     goToPage(currentPage - 1)
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 44, height: 40)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 34, height: 38)
                         .contentShape(Rectangle())
                 }
                 .disabled(currentPage == 0 || isLoadingPage)
@@ -251,20 +251,20 @@ struct CategoryView: View {
                 if isLoadingPage {
                     ProgressView()
                         .controlSize(.small)
-                        .frame(width: 116, height: 40)
+                        .frame(width: 86, height: 38)
                 } else {
                     Button {
                         jumpText = "\(currentPage + 1)"
                         showJump = true
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Text("第 \(currentPage + 1) 页")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.footnote.weight(.semibold))
                                 .monospacedDigit()
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 8, weight: .semibold))
+                                .font(.system(size: 7, weight: .semibold))
                         }
-                        .frame(width: 116, height: 40)
+                        .frame(width: 86, height: 38)
                     }
                 }
 
@@ -272,20 +272,25 @@ struct CategoryView: View {
                     goToPage(currentPage + 1)
                 } label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 44, height: 40)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 34, height: 38)
                         .contentShape(Rectangle())
                 }
                 .disabled(!canGoNext || isLoadingPage)
                 .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .frame(height: 50)
+            .padding(.horizontal, 4)
+            .frame(height: 44)
             .modifier(CategoryGlassCapsule())
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {}
+        }
     }
 
     private func loadFirstPage() async {
