@@ -166,6 +166,8 @@ struct FilesView: View {
     }
 }
 
+private let selectionAnnotationMarker = "wnacg.page.selection"
+
 @MainActor
 private final class PDFEditorModel: ObservableObject {
     let url: URL
@@ -181,17 +183,26 @@ private final class PDFEditorModel: ObservableObject {
         pageCount = document?.pageCount ?? 0
     }
 
-    func deleteCurrentPage() -> Bool {
-        guard let document, document.pageCount > 1,
-              currentPageIndex >= 0,
-              currentPageIndex < document.pageCount else {
-            errorMessage = "当前 PDF 只剩一页，不能删除。"
+    func deletePages(_ indexes: Set<Int>) -> Bool {
+        guard let document else {
+            errorMessage = "无法打开 PDF。"
+            return false
+        }
+        let valid = indexes.filter {
+            $0 >= 0 && $0 < document.pageCount
+        }
+        guard !valid.isEmpty else { return false }
+        guard valid.count < document.pageCount else {
+            errorMessage = "不能删除全部页面。"
             return false
         }
 
-        document.removePage(at: currentPageIndex)
+        clearSelectionAnnotations()
+        for index in valid.sorted(by: >) {
+            document.removePage(at: index)
+        }
         pageCount = document.pageCount
-        currentPageIndex = min(currentPageIndex, pageCount - 1)
+        currentPageIndex = min(currentPageIndex, max(0, pageCount - 1))
 
         guard let data = document.dataRepresentation() else {
             errorMessage = "无法重新生成 PDF 数据。"
@@ -205,12 +216,24 @@ private final class PDFEditorModel: ObservableObject {
             return false
         }
     }
+
+    private func clearSelectionAnnotations() {
+        guard let document else { return }
+        for pageIndex in 0..<document.pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+            for annotation in page.annotations
+            where annotation.contents == selectionAnnotationMarker {
+                page.removeAnnotation(annotation)
+            }
+        }
+    }
 }
 
 private struct PDFPreviewView: View {
     let url: URL
     @StateObject private var model: PDFEditorModel
     @State private var isEditing = false
+    @State private var selectedPages: Set<Int> = []
     @State private var showDeleteConfirmation = false
     @Environment(\.dismiss) private var dismiss
 
@@ -225,7 +248,9 @@ private struct PDFPreviewView: View {
                 if let document = model.document {
                     PDFKitView(
                         document: document,
-                        currentPageIndex: $model.currentPageIndex
+                        currentPageIndex: $model.currentPageIndex,
+                        isEditing: isEditing,
+                        selectedPages: $selectedPages
                     )
                     .id(model.pageCount)
                     .ignoresSafeArea(edges: .bottom)
@@ -248,6 +273,9 @@ private struct PDFPreviewView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(isEditing ? "完成编辑" : "编辑") {
                         isEditing.toggle()
+                        if !isEditing {
+                            selectedPages.removeAll()
+                        }
                     }
                     .disabled(model.document == nil || model.pageCount == 0)
                 }
@@ -256,17 +284,20 @@ private struct PDFPreviewView: View {
                     Button("关闭") { dismiss() }
                 }
             }
-            .alert("删除当前页？", isPresented: $showDeleteConfirmation) {
+            .alert("删除选中的页？", isPresented: $showDeleteConfirmation) {
                 Button("取消", role: .cancel) {}
                 Button("删除", role: .destructive) {
-                    if model.deleteCurrentPage() {
+                    if model.deletePages(selectedPages) {
+                        selectedPages.removeAll()
                         NotificationCenter.default.post(
                             name: .downloadsChanged, object: nil
                         )
                     }
                 }
             } message: {
-                Text("第 \(model.currentPageIndex + 1) 页，共 \(model.pageCount) 页")
+                Text(
+                    "共 \(selectedPages.count) 页，此操作会直接覆盖保存当前 PDF。"
+                )
             }
             .alert(
                 "编辑失败",
@@ -283,38 +314,32 @@ private struct PDFPreviewView: View {
     }
 
     private var editBar: some View {
-        HStack(spacing: 14) {
-            Button {
-                model.currentPageIndex = max(0, model.currentPageIndex - 1)
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .disabled(model.currentPageIndex == 0)
-
-            Text("第 \(model.currentPageIndex + 1) / \(model.pageCount) 页")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 88)
-
-            Button {
-                model.currentPageIndex = min(
-                    model.pageCount - 1, model.currentPageIndex + 1
-                )
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-            .disabled(model.currentPageIndex >= model.pageCount - 1)
+        HStack(spacing: 12) {
+            Text(
+                selectedPages.isEmpty
+                    ? "点击页面选择要删除的页"
+                    : "已选 \(selectedPages.count) 页"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             Spacer(minLength: 4)
+
+            if !selectedPages.isEmpty {
+                Button("取消选择") {
+                    selectedPages.removeAll()
+                }
+                .font(.caption)
+            }
 
             Button(role: .destructive) {
                 showDeleteConfirmation = true
             } label: {
-                Label("删除本页", systemImage: "trash")
+                Label("删除选中", systemImage: "trash")
             }
-            .disabled(model.pageCount <= 1)
+            .font(.subheadline)
+            .disabled(selectedPages.isEmpty)
         }
-        .font(.subheadline)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial)
@@ -324,6 +349,8 @@ private struct PDFPreviewView: View {
 private struct PDFKitView: UIViewRepresentable {
     let document: PDFDocument
     @Binding var currentPageIndex: Int
+    let isEditing: Bool
+    @Binding var selectedPages: Set<Int>
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -337,20 +364,33 @@ private struct PDFKitView: UIViewRepresentable {
         view.backgroundColor = UIColor(red: 0.04, green: 0.06, blue: 0.10, alpha: 1)
         view.document = document
         context.coordinator.observe(view)
+        context.coordinator.pdfView = view
+
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:))
+        )
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+
         showCurrentPage(in: view)
+        context.coordinator.syncSelection()
         return view
     }
 
     func updateUIView(_ view: PDFView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.pdfView = view
         if view.document !== document {
             view.document = document
         }
         showCurrentPage(in: view)
+        context.coordinator.syncSelection()
     }
 
     static func dismantleUIView(_ uiView: PDFView, coordinator: Coordinator) {
         coordinator.stopObserving()
+        coordinator.clearSelectionAnnotations()
     }
 
     private func showCurrentPage(in view: PDFView) {
@@ -363,6 +403,8 @@ private struct PDFKitView: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         var parent: PDFKitView
+        weak var pdfView: PDFView?
+        private var annotations: [Int: PDFAnnotation] = [:]
 
         init(_ parent: PDFKitView) {
             self.parent = parent
@@ -392,6 +434,81 @@ private struct PDFKitView: UIViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 self?.parent.currentPageIndex = index
             }
+        }
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard parent.isEditing,
+                  let view = pdfView,
+                  let document = view.document else {
+                return
+            }
+            let point = gesture.location(in: view)
+            guard let page = view.page(for: point, nearest: true) else {
+                return
+            }
+            let index = document.index(for: page)
+            guard index >= 0, index < document.pageCount else { return }
+
+            var selection = parent.selectedPages
+            if selection.contains(index) {
+                selection.remove(index)
+                removeAnnotation(for: index)
+            } else {
+                selection.insert(index)
+                addAnnotation(for: index, page: page)
+            }
+            parent.selectedPages = selection
+        }
+
+        func syncSelection() {
+            guard let document = pdfView?.document else {
+                clearSelectionAnnotations()
+                return
+            }
+            let desired = parent.isEditing ? parent.selectedPages : []
+
+            for index in Array(annotations.keys) where !desired.contains(index) {
+                removeAnnotation(for: index)
+            }
+            for index in desired where annotations[index] == nil {
+                guard let page = document.page(at: index) else { continue }
+                addAnnotation(for: index, page: page)
+            }
+        }
+
+        func clearSelectionAnnotations() {
+            for index in Array(annotations.keys) {
+                removeAnnotation(for: index)
+            }
+        }
+
+        private func addAnnotation(for index: Int, page: PDFPage) {
+            guard annotations[index] == nil else { return }
+            let bounds = page.bounds(for: .mediaBox)
+            guard !bounds.isEmpty else { return }
+
+            let annotation = PDFAnnotation(
+                bounds: bounds,
+                forType: .square,
+                withProperties: nil
+            )
+            annotation.color = UIColor.systemMint.withAlphaComponent(0.8)
+            annotation.interiorColor = UIColor.systemMint.withAlphaComponent(0.18)
+            let border = PDFBorder()
+            border.lineWidth = 2
+            annotation.border = border
+            annotation.contents = selectionAnnotationMarker
+            page.addAnnotation(annotation)
+            annotations[index] = annotation
+        }
+
+        private func removeAnnotation(for index: Int) {
+            guard let annotation = annotations.removeValue(forKey: index),
+                  let document = pdfView?.document,
+                  let page = document.page(at: index) else {
+                return
+            }
+            page.removeAnnotation(annotation)
         }
     }
 }
