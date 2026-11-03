@@ -93,9 +93,6 @@ struct CategoryView: View {
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
     @State private var selectedAlbum: HomeAlbum?
-    @State private var displayedCount = 0
-    @State private var isLoadingBatch = false
-    private let batchSize = 18
 
     init(
         title: String,
@@ -109,13 +106,15 @@ struct CategoryView: View {
 
     var body: some View {
         BatchGridView(
-            albums: displayedAlbums,
-            isLoading: isLoadingBatch,
-            hasMore: model.hasMore || displayedCount < visibleAlbums.count,
+            albums: visibleAlbums,
+            isLoading: false,
+            hasMore: model.hasMore,
             datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
             reloadToken: model.resetGeneration,
             onSelect: { selectedAlbum = $0 },
-            onLoadMore: { loadNextBatchIfNeeded() }
+            onLoadMore: {
+                Task { await model.loadMore() }
+            }
         )
         .background(background)
         .navigationTitle(title)
@@ -131,25 +130,18 @@ struct CategoryView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await reloadFirstBatch() }
+                    Task { await model.reload() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(model.isLoading || isLoadingBatch)
+                .disabled(model.isLoading)
             }
         }
         .task {
-            await loadFirstBatch()
-        }
-        .onChange(of: languageFilter) { _, _ in
-            resetBatch()
-        }
-        .onChange(of: hideAI) { _, _ in
-            resetBatch()
+            await model.loadIfNeeded()
         }
         .overlay {
-            if visibleAlbums.isEmpty
-                || (displayedAlbums.isEmpty && model.isLoading) {
+            if visibleAlbums.isEmpty {
                 if model.isLoading {
                     ProgressView("正在加载…")
                 } else if let error = model.error {
@@ -162,7 +154,7 @@ struct CategoryView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                         Button("重试") {
-                            Task { await reloadFirstBatch() }
+                            Task { await model.reload() }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.mint)
@@ -185,64 +177,6 @@ struct CategoryView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var displayedAlbums: [HomeAlbum] {
-        Array(visibleAlbums.prefix(displayedCount))
-    }
-
-    private func loadFirstBatch() async {
-        await model.loadIfNeeded()
-        var attempts = 0
-        while visibleAlbums.count < batchSize,
-              model.hasMore,
-              !model.isLoading,
-              attempts < 8 {
-            let before = visibleAlbums.count
-            await model.loadMore()
-            attempts += 1
-            if visibleAlbums.count == before { break }
-        }
-        displayedCount = min(batchSize, visibleAlbums.count)
-    }
-
-    private func reloadFirstBatch() async {
-        displayedCount = 0
-        isLoadingBatch = false
-        await model.reload()
-        await loadFirstBatch()
-    }
-
-    private func resetBatch() {
-        displayedCount = min(batchSize, visibleAlbums.count)
-        if displayedCount < batchSize {
-            loadNextBatchIfNeeded()
-        }
-    }
-
-    private func loadNextBatchIfNeeded() {
-        guard !isLoadingBatch,
-              !model.isLoading,
-              model.error == nil,
-              (displayedCount < visibleAlbums.count || model.hasMore) else {
-            return
-        }
-        isLoadingBatch = true
-        Task {
-            let target = displayedCount + batchSize
-            var attempts = 0
-            while visibleAlbums.count < target,
-                  model.hasMore,
-                  !model.isLoading,
-                  attempts < 8 {
-                let before = visibleAlbums.count
-                await model.loadMore()
-                attempts += 1
-                if visibleAlbums.count == before { break }
-            }
-            displayedCount = min(max(target, displayedCount), visibleAlbums.count)
-            isLoadingBatch = false
         }
     }
 
