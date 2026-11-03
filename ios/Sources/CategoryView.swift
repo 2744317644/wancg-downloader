@@ -144,9 +144,8 @@ struct CategoryView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    if appliesLanguageFilter {
-                        filterRow(proxy: proxy)
-                    }
+                    filterRow(proxy: proxy)
+                        .id("category-top")
                     content
                 }
                 .padding(.horizontal, 16)
@@ -230,7 +229,7 @@ struct CategoryView: View {
                 // out entirely) `onAppear` fires again and the next page is
                 // pulled. Off-screen sentinels stay dormant, so the feed can
                 // never chain-load in the background.
-                .id("load-more-\(model.albums.count)")
+                .id("load-more-\(model.loadedPageCount)-\(model.albums.count)")
                 .onAppear { requestMore() }
         }
     }
@@ -345,9 +344,9 @@ struct CategoryView: View {
                 .lineLimit(3)
                 .padding(.horizontal, 24)
             Button("重试") {
-                Task { @MainActor in
-                    await fillFilteredPages(limit: 3)
-                }
+                // fillFilteredPages stops when `error != nil`, so retry through
+                // requestMore(force:) which starts a fresh page load instead.
+                requestMore(force: true)
             }
             .buttonStyle(.borderedProminent)
             .tint(.mint)
@@ -413,7 +412,7 @@ struct CategoryView: View {
                 }
                 .font(.caption)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -471,8 +470,8 @@ struct CategoryView: View {
                 selected ? Color.mint : Color.primary.opacity(0.06),
                 in: Capsule()
             )
-            .contentShape(Capsule())
             .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -497,8 +496,8 @@ struct CategoryView: View {
                 hideAI ? Color.mint : Color.primary.opacity(0.06),
                 in: Capsule()
             )
-            .contentShape(Capsule())
             .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(hideAI ? .isSelected : [])
@@ -514,12 +513,14 @@ struct CategoryView: View {
     }
 
     private func scrollToTop(proxy: ScrollViewProxy) {
-        guard let first = visibleAlbums.first else { return }
+        // Anchor above the chips (not the first album) so the changed filter
+        // state is visible again after switching filters.
+        guard appliesLanguageFilter || !visibleAlbums.isEmpty else { return }
         if reduceMotion {
-            proxy.scrollTo(first.id, anchor: .top)
+            proxy.scrollTo("category-top", anchor: .top)
         } else {
             withAnimation(.snappy(duration: 0.32)) {
-                proxy.scrollTo(first.id, anchor: .top)
+                proxy.scrollTo("category-top", anchor: .top)
             }
         }
     }

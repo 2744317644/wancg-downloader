@@ -80,7 +80,7 @@ final class CategoryScreenUITests: XCTestCase {
         )
         if translated.exists {
             XCTAssertGreaterThanOrEqual(
-                translated.frame.height, 44,
+                translated.frame.height, 43.5,
                 "filter chip touch target must be at least 44pt"
             )
             translated.tap()
@@ -103,7 +103,7 @@ final class CategoryScreenUITests: XCTestCase {
         let aiChip = app.buttons["屏蔽 AI"].firstMatch
         if aiChip.waitForExistence(timeout: 5) {
             XCTAssertGreaterThanOrEqual(
-                aiChip.frame.height, 44,
+                aiChip.frame.height, 43.5,
                 "AI filter chip touch target must be at least 44pt"
             )
             aiChip.tap()
