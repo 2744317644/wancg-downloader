@@ -11,6 +11,7 @@ final class PerformanceMonitor: ObservableObject {
     private var lastTimestamp: CFTimeInterval = 0
     private var frames = 0
     private var reportStart: CFTimeInterval = 0
+    private var windowWorst = 0
 
     func start() {
         guard displayLink == nil else { return }
@@ -22,6 +23,7 @@ final class PerformanceMonitor: ObservableObject {
         displayLink = link
         reportStart = CACurrentMediaTime()
         lastTimestamp = 0
+        windowWorst = 0
     }
 
     func stop() {
@@ -32,10 +34,16 @@ final class PerformanceMonitor: ObservableObject {
     @objc private func tick(_ link: CADisplayLink) {
         if lastTimestamp > 0 {
             let delta = link.timestamp - lastTimestamp
-            let milliseconds = Int(delta * 1000)
-            if milliseconds > worstFrameMilliseconds {
-                worstFrameMilliseconds = milliseconds
+            if delta > 0.25 {
+                // App was suspended or the display link was paused.
+                lastTimestamp = link.timestamp
+                reportStart = link.timestamp
+                frames = 0
+                windowWorst = 0
+                return
             }
+            let milliseconds = Int(delta * 1000)
+            windowWorst = max(windowWorst, milliseconds)
         }
         lastTimestamp = link.timestamp
         frames += 1
@@ -43,6 +51,8 @@ final class PerformanceMonitor: ObservableObject {
         let elapsed = link.timestamp - reportStart
         if elapsed >= 1 {
             fps = Int(Double(frames) / elapsed)
+            worstFrameMilliseconds = windowWorst
+            windowWorst = 0
             frames = 0
             reportStart = link.timestamp
         }
