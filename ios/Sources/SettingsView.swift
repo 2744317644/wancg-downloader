@@ -4,6 +4,7 @@ struct SettingsView: View {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage("network.useSystemNetwork") private var useSystemNetwork = false
     @AppStorage("display.force120") private var force120 = true
+    @AppStorage("performance.coverConcurrency") private var coverConcurrency = 3
     @AppStorage("performance.readerConcurrency") private var readerConcurrency = 2
     @AppStorage("content.hideAI") private var hideAI = false
     @AppStorage("debug.showFPS") private var showFPS = false
@@ -59,6 +60,15 @@ struct SettingsView: View {
 
                 Section {
                     Stepper(
+                        "封面并发 \(coverConcurrency)",
+                        value: $coverConcurrency,
+                        in: 1...6
+                    )
+                    .onChange(of: coverConcurrency) { _, value in
+                        CoverImageStore.shared.setConcurrency(value)
+                    }
+
+                    Stepper(
                         "阅读器预载并发 \(readerConcurrency)",
                         value: $readerConcurrency,
                         in: 1...4
@@ -70,8 +80,8 @@ struct SettingsView: View {
                     Text("性能")
                 } footer: {
                     Text(
-                        "调高阅读器预载并发会更快加载后续图片，但会增加 CPU、内存和 429 风险；"
-                        + "卡顿或限流时调低。封面加载由 Kingfisher 自动管理。"
+                        "调高封面/阅读器预载并发会更快，但会增加 CPU、内存和 429 风险；"
+                        + "卡顿或限流时调低。"
                     )
                 }
 
