@@ -11,6 +11,8 @@ final class AppModel: ObservableObject {
     @Published var status = "粘贴作品链接后点“解析”"
     @Published var downloadProgress: Double = 0
     @Published var pdfProgress: Double = 0
+    @Published var downloadSpeed: Double = 0
+    @Published var downloadETA: TimeInterval?
     @Published var errorMessage: String?
     @Published var zipURL: URL?
     @Published var pdfURL: URL?
@@ -23,6 +25,9 @@ final class AppModel: ObservableObject {
     private var inflightItem: QueuedDownload?
     private var didResumeQueue = false
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var lastProgressDate: Date?
+    private var lastProgressBytes: Int64 = 0
+    private var smoothedSpeed: Double = 0
 
     var hasActiveDownload: Bool {
         activeAid != nil || isBusy
@@ -203,6 +208,40 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func updateDownloadMetrics(
+        value: Double,
+        written: Int64,
+        total: Int64
+    ) {
+        downloadProgress = min(1, max(0, value)) * 0.7
+
+        let now = Date()
+        if let lastDate = lastProgressDate {
+            let elapsed = now.timeIntervalSince(lastDate)
+            if elapsed >= 0.35 {
+                let delta = max(0, written - lastProgressBytes)
+                let instant = Double(delta) / elapsed
+                if smoothedSpeed == 0 {
+                    smoothedSpeed = instant
+                } else {
+                    smoothedSpeed = smoothedSpeed * 0.7 + instant * 0.3
+                }
+                lastProgressDate = now
+                lastProgressBytes = written
+            }
+        } else {
+            lastProgressDate = now
+            lastProgressBytes = written
+        }
+
+        downloadSpeed = smoothedSpeed
+        if total > written, smoothedSpeed > 0 {
+            downloadETA = Double(total - written) / smoothedSpeed
+        } else {
+            downloadETA = nil
+        }
+    }
+
     private func processNext() {
         guard activeAid == nil, !isBusy, !queue.isEmpty else { return }
         let next = queue.removeFirst()
@@ -233,6 +272,11 @@ final class AppModel: ObservableObject {
         pdfURL = nil
         downloadProgress = 0
         pdfProgress = 0
+        downloadSpeed = 0
+        downloadETA = nil
+        lastProgressDate = nil
+        lastProgressBytes = 0
+        smoothedSpeed = 0
         status = "正在获取下载地址…"
         beginBackgroundTask()
         DownloadLiveActivityManager.shared.start(
@@ -253,9 +297,11 @@ final class AppModel: ObservableObject {
             status = "正在下载 ZIP…"
             let downloaded = try await client.download(
                 info, referer: preview.pageURL
-            ) { value in
+            ) { value, written, total in
                 Task { @MainActor in
-                    self.downloadProgress = value * 0.7
+                    self.updateDownloadMetrics(
+                        value: value, written: written, total: total
+                    )
                     DownloadLiveActivityManager.shared.update(
                         progress: value * 0.7, status: "正在下载 ZIP…"
                     )
