@@ -144,7 +144,13 @@ struct BatchGridView: UIViewRepresentable {
             }
 
             if loadingChanged {
+                if !isLoading {
+                    lastRequestedCount = -1
+                }
                 collectionView.collectionViewLayout.invalidateLayout()
+                DispatchQueue.main.async { [weak self] in
+                    self?.checkContentNeedsMore()
+                }
             }
         }
 
