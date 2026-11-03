@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("performance.coverConcurrency") private var coverConcurrency = 3
     @AppStorage("performance.readerConcurrency") private var readerConcurrency = 2
     @AppStorage("content.hideAI") private var hideAI = false
+    @AppStorage("debug.showFPS") private var showFPS = false
 
     var body: some View {
         NavigationStack {
@@ -90,6 +91,14 @@ struct SettingsView: View {
                     Text("内容")
                 } footer: {
                     Text("开启后首页、分类和搜索会隐藏标题中带 AI 标记的作品；收藏和历史不受影响。")
+                }
+
+                Section {
+                    Toggle("显示 FPS / 最慢帧", isOn: $showFPS)
+                } header: {
+                    Text("诊断")
+                } footer: {
+                    Text("在右上角显示实时 FPS 和最近最慢一帧耗时，用于反馈滑动卡顿。")
                 }
 
                 Section("关于") {
