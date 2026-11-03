@@ -44,6 +44,7 @@ struct CategoryGridView: UIViewRepresentable {
         )
         collectionView.delegate = context.coordinator
         collectionView.dataSource = context.coordinator
+        collectionView.prefetchDataSource = context.coordinator
 
         let refresh = UIRefreshControl()
         refresh.tintColor = .systemMint
@@ -85,7 +86,8 @@ struct CategoryGridView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, UICollectionViewDelegate,
-        UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+        UICollectionViewDataSource, UICollectionViewDataSourcePrefetching,
+        UICollectionViewDelegateFlowLayout {
         weak var collectionView: UICollectionView?
 
         var albums: [HomeAlbum] = []
@@ -169,6 +171,26 @@ struct CategoryGridView: UIViewRepresentable {
                 cell.configure(with: albums[indexPath.item])
             }
             return cell
+        }
+
+        func collectionView(
+            _ collectionView: UICollectionView,
+            prefetchItemsAt indexPaths: [IndexPath]
+        ) {
+            for indexPath in indexPaths where albums.indices.contains(indexPath.item) {
+                let album = albums[indexPath.item]
+                guard let url = album.coverURL else { continue }
+                CoverImageStore.shared.prefetch(
+                    for: url, referer: album.pageURL
+                )
+            }
+        }
+
+        func collectionView(
+            _ collectionView: UICollectionView,
+            cancelPrefetchingForItemsAt indexPaths: [IndexPath]
+        ) {
+            // Shared requests may still be awaited by a visible cell.
         }
 
         private func requestMore() {
