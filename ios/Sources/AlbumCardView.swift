@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Kingfisher
 
 struct AlbumCardView: View {
     let album: HomeAlbum
@@ -32,44 +33,53 @@ struct AlbumCardView: View {
 
 struct HomeCover: View {
     let album: HomeAlbum
-    @State private var image: UIImage?
+
+    private static let userAgent =
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) " +
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+        "Version/17.0 Mobile/15E148 Safari/604.1"
+
+    private var coverModifier: AnyModifier {
+        AnyModifier { request in
+            var request = request
+            request.setValue(
+                album.pageURL.absoluteString,
+                forHTTPHeaderField: "Referer"
+            )
+            request.setValue(
+                Self.userAgent, forHTTPHeaderField: "User-Agent"
+            )
+            return request
+        }
+    }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.low)
-                    .scaledToFill()
-            } else {
-                Image(systemName: "photo")
-                    .font(.title3)
-                    .foregroundStyle(Color.primary.opacity(0.18))
-            }
+            KFImage(album.coverURL)
+                .placeholder {
+                    Image(systemName: "photo")
+                        .font(.title3)
+                        .foregroundStyle(Color.primary.opacity(0.18))
+                }
+                .setProcessor(
+                    DownsamplingImageProcessor(
+                        size: CGSize(width: 360, height: 480)
+                    )
+                )
+                .scaleFactor(UIScreen.main.scale)
+                .backgroundDecode()
+                .requestModifier(coverModifier)
+                .fade(duration: 0.15)
+                .resizable()
+                .scaledToFill()
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .task(id: album.coverURL) {
-            guard let coverURL = album.coverURL else { return }
-            if let cached = CoverImageStore.shared.cachedImage(for: coverURL) {
-                image = cached
-                return
-            }
-            // Avoid starting a burst of image requests while the grid is
-            // still moving; a view that disappears cancels this task.
-            try? await Task.sleep(nanoseconds: 80_000_000)
-            guard !Task.isCancelled else { return }
-            let loaded = await CoverImageStore.shared.image(
-                for: coverURL, referer: album.pageURL
-            )
-            guard !Task.isCancelled, let loaded else { return }
-            image = loaded
-        }
     }
 }
