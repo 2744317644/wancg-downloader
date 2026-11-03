@@ -116,19 +116,38 @@ struct CategoryView: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(pageItems) { album in
-                    NavigationLink {
-                        AlbumDetailView(album: album)
-                    } label: {
-                        AlbumCardView(album: album)
+            VStack(spacing: 14) {
+                HStack(spacing: 8) {
+                    Text("\(title) · \(visibleAlbums.count) 部")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 4) {
+                        Text("最新更新")
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
                     }
-                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.mint)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(pageItems) { album in
+                        NavigationLink {
+                            AlbumDetailView(album: album)
+                        } label: {
+                            AlbumCardView(album: album)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 18)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 18)
         }
         .scrollIndicators(.hidden)
         .id(currentPage)
@@ -233,58 +252,49 @@ struct CategoryView: View {
     }
 
     private var floatingBar: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                Button {
-                    goToPage(currentPage - 1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .contentShape(Circle())
-                }
-                .disabled(currentPage == 0 || isLoadingPage)
-                .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
-
-                if isLoadingPage {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 78, height: 32)
-                } else {
-                    Button {
-                        jumpText = "\(currentPage + 1)"
-                        showJump = true
-                    } label: {
-                        Text("\(currentPage + 1) / \(loadedPageCount)")
-                            .font(.footnote.weight(.semibold))
-                            .monospacedDigit()
-                            .frame(width: 78, height: 32)
-                            .contentShape(Rectangle())
-                    }
-                }
-
-                Button {
-                    goToPage(currentPage + 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .contentShape(Circle())
-                }
-                .disabled(!canGoNext || isLoadingPage)
-                .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
+        HStack(spacing: 16) {
+            Button {
+                goToPage(currentPage - 1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .frame(height: 40)
-            .modifier(CategoryGlassCapsule())
+            .disabled(currentPage == 0 || isLoadingPage)
+            .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
 
-            Spacer(minLength: 0)
+            if isLoadingPage {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 64, height: 32)
+            } else {
+                Button {
+                    jumpText = "\(currentPage + 1)"
+                    showJump = true
+                } label: {
+                    Text("\(currentPage + 1) / \(loadedPageCount)")
+                        .font(.footnote.weight(.semibold))
+                        .monospacedDigit()
+                        .frame(minWidth: 64, minHeight: 32)
+                }
+            }
+
+            Button {
+                goToPage(currentPage + 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!canGoNext || isLoadingPage)
+            .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .padding(.bottom, 4)
         .background {
             Color.clear
                 .contentShape(Rectangle())
@@ -382,19 +392,5 @@ struct CategoryView: View {
     private var background: some View {
         Color(uiColor: .systemGroupedBackground)
             .ignoresSafeArea()
-    }
-}
-
-private struct CategoryGlassCapsule: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
-        }
     }
 }
