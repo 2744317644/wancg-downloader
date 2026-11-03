@@ -214,6 +214,32 @@ struct CategoryGridView: UIViewRepresentable {
             Task { await onRefresh() }
         }
 
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            CoverImageStore.shared.setScrolling(true)
+        }
+
+        func scrollViewDidEndDragging(
+            _ scrollView: UIScrollView,
+            willDecelerate decelerate: Bool
+        ) {
+            if !decelerate {
+                finishScrolling()
+            }
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            finishScrolling()
+        }
+
+        private func finishScrolling() {
+            CoverImageStore.shared.setScrolling(false)
+            guard let collectionView else { return }
+            let visible = collectionView.indexPathsForVisibleItems
+            UIView.performWithoutAnimation {
+                collectionView.reloadItems(at: visible)
+            }
+        }
+
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard !isLoading, hasMore else { return }
             let remaining = scrollView.contentSize.height
@@ -328,6 +354,7 @@ private final class AlbumGridCell: UICollectionViewCell {
         coverView.image = nil
 
         task?.cancel()
+        guard !CoverImageStore.shared.suppressLoads else { return }
         guard let url = album.coverURL else { return }
         let aid = album.aid
         task = Task { @MainActor [weak self] in
