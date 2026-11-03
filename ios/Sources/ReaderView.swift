@@ -266,6 +266,7 @@ struct ReaderView: View {
                         .id(index)
                     }
                 }
+                .scrollTargetLayout()
             }
             .scrollIndicators(.hidden)
             .scrollPosition(id: $visiblePage, anchor: .center)
