@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 extension Notification.Name {
     static let appReturnedFromBackground = Notification.Name(
@@ -18,6 +19,10 @@ struct WnacgApp: App {
             diskCapacity: 256 * 1024 * 1024,
             diskPath: "wnacg-url-cache"
         )
+        ImageCache.default.memoryStorage.config.totalCostLimit =
+            64 * 1024 * 1024
+        ImageCache.default.diskStorage.config.sizeLimit =
+            256 * 1024 * 1024
         if !UserDefaults.standard.bool(
             forKey: ProxySession.systemNetworkKey
         ) {
