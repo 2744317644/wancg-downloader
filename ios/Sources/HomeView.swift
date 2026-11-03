@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import ImageIO
+import CryptoKit
 
 @MainActor
 final class HomeFeedModel: ObservableObject {
@@ -36,6 +38,200 @@ final class HomeFeedModel: ObservableObject {
         if current == generation {
             isLoading = false
         }
+    }
+}
+
+private actor CoverLimiter {
+    private var limit: Int
+    private var active = 0
+    private var order: [UUID] = []
+    private var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
+
+    init(limit: Int) {
+        self.limit = max(1, limit)
+    }
+
+    func acquire() async throws {
+        if active < limit {
+            active += 1
+            return
+        }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Void, Error>) in
+                waiters[id] = continuation
+                order.append(id)
+            }
+        } onCancel: {
+            Task { await self.cancel(id) }
+        }
+    }
+
+    func updateLimit(_ newLimit: Int) {
+        limit = max(1, newLimit)
+        while active < limit {
+            guard let id = order.first else { break }
+            order.removeFirst()
+            guard let continuation = waiters.removeValue(forKey: id) else {
+                continue
+            }
+            active += 1
+            continuation.resume()
+        }
+    }
+
+    private func cancel(_ id: UUID) {
+        guard let continuation = waiters.removeValue(forKey: id) else {
+            return
+        }
+        order.removeAll { $0 == id }
+        continuation.resume(throwing: CancellationError())
+    }
+
+    func release() {
+        while let id = order.first {
+            order.removeFirst()
+            guard let continuation = waiters.removeValue(forKey: id) else {
+                continue
+            }
+            continuation.resume()
+            return
+        }
+        active = max(0, active - 1)
+    }
+}
+
+@MainActor
+final class CoverImageStore {
+    static let shared = CoverImageStore()
+    static let concurrencyKey = "performance.coverConcurrency"
+
+    private let cache = NSCache<NSURL, UIImage>()
+    private let limiter: CoverLimiter
+    private let coverCacheDirectory: URL
+    private var client: WnacgClient?
+
+    private init() {
+        let saved = UserDefaults.standard.object(
+            forKey: Self.concurrencyKey
+        ) as? Int ?? 3
+        limiter = CoverLimiter(limit: saved)
+        let caches = FileManager.default.urls(
+            for: .cachesDirectory, in: .userDomainMask
+        ).first ?? FileManager.default.temporaryDirectory
+        coverCacheDirectory = caches.appendingPathComponent(
+            "CoverThumbnails", isDirectory: true
+        )
+        try? FileManager.default.createDirectory(
+            at: coverCacheDirectory, withIntermediateDirectories: true
+        )
+        cache.countLimit = 120
+        cache.totalCostLimit = 48 * 1024 * 1024
+    }
+
+    func setConcurrency(_ value: Int) {
+        let clamped = min(6, max(1, value))
+        Task { await limiter.updateLimit(clamped) }
+    }
+
+    func cachedImage(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func image(for url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+
+        let directory = coverCacheDirectory
+        if let diskImage = await Task.detached(priority: .utility, operation: {
+            Self.readThumbnail(for: url, in: directory)
+        }).value {
+            cache.setObject(
+                diskImage,
+                forKey: url as NSURL,
+                cost: Int(diskImage.size.width * diskImage.size.height * 4)
+            )
+            return diskImage
+        }
+
+        return await loadImage(for: url, referer: referer)
+    }
+
+    private func loadImage(for url: URL, referer: URL) async -> UIImage? {
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+        do {
+            try Task.checkCancellation()
+            try await limiter.acquire()
+            defer {
+                Task { await limiter.release() }
+            }
+            try Task.checkCancellation()
+            if let cached = cache.object(forKey: url as NSURL) {
+                return cached
+            }
+            if client == nil {
+                client = try? WnacgClient()
+            }
+            guard let client else { return nil }
+            let data = try await client.imageData(url, referer: referer)
+            try Task.checkCancellation()
+            let image = await Task.detached(priority: .background) {
+                Self.downsample(data)
+            }.value
+            guard let image else { return nil }
+            let cost = Int(image.size.width * image.size.height * 4)
+            cache.setObject(image, forKey: url as NSURL, cost: cost)
+
+            if let thumbnail = image.jpegData(compressionQuality: 0.82) {
+                let directory = coverCacheDirectory
+                Task.detached(priority: .utility) {
+                    let destination = Self.diskURL(for: url, in: directory)
+                    try? thumbnail.write(to: destination, options: .atomic)
+                }
+            }
+            return image
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated private static func diskURL(for url: URL, in directory: URL) -> URL {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return directory.appendingPathComponent(name + ".jpg")
+    }
+
+    nonisolated private static func readThumbnail(
+        for url: URL,
+        in directory: URL
+    ) -> UIImage? {
+        let path = diskURL(for: url, in: directory).path
+        guard FileManager.default.fileExists(atPath: path) else {
+            return nil
+        }
+        return UIImage(contentsOfFile: path)
+    }
+
+    nonisolated private static func downsample(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return UIImage(data: data)
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 360,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source, 0, options as CFDictionary
+        ) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
     }
 }
 
