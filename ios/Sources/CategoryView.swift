@@ -122,6 +122,11 @@ struct CategoryView: View {
                         AlbumCardView(album: album)
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        if album.aid == displayedAlbums.last?.aid {
+                            loadNextBatchIfNeeded()
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -177,7 +182,8 @@ struct CategoryView: View {
             resetBatch()
         }
         .overlay {
-            if visibleAlbums.isEmpty {
+            if visibleAlbums.isEmpty
+                || (displayedAlbums.isEmpty && model.isLoading) {
                 if model.isLoading {
                     ProgressView("正在加载…")
                 } else if let error = model.error {
@@ -222,6 +228,16 @@ struct CategoryView: View {
 
     private func loadFirstBatch() async {
         await model.loadIfNeeded()
+        var attempts = 0
+        while visibleAlbums.count < batchSize,
+              model.hasMore,
+              !model.isLoading,
+              attempts < 8 {
+            let before = visibleAlbums.count
+            await model.loadMore()
+            attempts += 1
+            if visibleAlbums.count == before { break }
+        }
         displayedCount = min(batchSize, visibleAlbums.count)
     }
 
