@@ -8,6 +8,7 @@ final class CategoryFeedModel: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var hasMore = true
     @Published private(set) var pageCount = 0
+    @Published private(set) var resetGeneration = 0
 
     private let startURL: URL
     private var nextURL: URL?
@@ -45,6 +46,7 @@ final class CategoryFeedModel: ObservableObject {
             albums = []
             loadedAids.removeAll(keepingCapacity: false)
             pageCount = 0
+            resetGeneration += 1
             nextURL = startURL
             hasMore = true
             error = nil
@@ -109,6 +111,8 @@ struct CategoryView: View {
             albums: albums,
             isLoading: model.isLoading,
             hasMore: model.hasMore,
+            datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
+            reloadToken: model.resetGeneration,
             topInset: safe.top + 44,
             bottomInset: safe.bottom + 56,
             onSelect: { selectedAlbum = $0 },
