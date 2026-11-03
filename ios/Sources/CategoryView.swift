@@ -145,7 +145,6 @@ struct CategoryView: View {
                 floatingBar
             }
         }
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
