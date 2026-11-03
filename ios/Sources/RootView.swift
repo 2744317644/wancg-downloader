@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @StateObject private var downloadModel = AppModel()
+    @StateObject private var chrome = AppChrome()
     @State private var selection = 0
     @AppStorage("debug.showFPS") private var showFPS = false
 
@@ -35,14 +36,15 @@ struct RootView: View {
         .environmentObject(FavoritesStore.shared)
         .environmentObject(DownloadHistory.shared)
         .environmentObject(HistoryStore.shared)
+        .environmentObject(chrome)
 
-        Group {
-            if #available(iOS 26.0, *) {
-                tabs.tabBarMinimizeBehavior(.never)
-            } else {
-                tabs
+        tabs
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !chrome.isBarHidden {
+                    AppBottomBar(selection: $selection, chrome: chrome)
+                }
             }
-        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .appReturnedFromBackground
