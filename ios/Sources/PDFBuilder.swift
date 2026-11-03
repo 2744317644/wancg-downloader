@@ -16,6 +16,10 @@ enum PDFBuilder {
         let renderer = UIGraphicsPDFRenderer(bounds: fallback)
         var pages = 0
         let total = images.count
+        // Every page uses the same width. Mixed portrait/landscape pages
+        // previously had different page widths, so PDF viewers displayed
+        // portrait pages narrower than landscape ones.
+        let pageWidth: CGFloat = 595
 
         try renderer.writePDF(to: output) { context in
             for imageURL in images {
@@ -23,9 +27,12 @@ enum PDFBuilder {
                     guard let image = UIImage(contentsOfFile: imageURL.path) else {
                         return
                     }
-                    let width = max(1, image.size.width * 72 / dpi)
-                    let height = max(1, image.size.height * 72 / dpi)
-                    let pageRect = CGRect(x: 0, y: 0, width: width, height: height)
+                    let imageWidth = max(1, image.size.width)
+                    let scale = pageWidth / imageWidth
+                    let pageHeight = max(1, image.size.height * scale)
+                    let pageRect = CGRect(
+                        x: 0, y: 0, width: pageWidth, height: pageHeight
+                    )
 
                     context.beginPage(withBounds: pageRect, pageInfo: [:])
                     context.cgContext.interpolationQuality = .high
