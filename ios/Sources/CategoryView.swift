@@ -97,7 +97,6 @@ struct CategoryView: View {
     @State private var isLoadingPage = false
     @State private var showJump = false
     @State private var jumpText = ""
-    @State private var pagerExpanded = false
     private let pageSize = 9
 
     private let columns = Array(
@@ -234,68 +233,49 @@ struct CategoryView: View {
     }
 
     private var floatingBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Button {
-                withAnimation(.snappy(duration: 0.22)) {
-                    pagerExpanded.toggle()
-                }
+                goToPage(currentPage - 1)
             } label: {
-                Image(systemName: "house.fill")
+                Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(pagerExpanded ? "收起翻页" : "展开翻页")
+            .disabled(currentPage == 0 || isLoadingPage)
+            .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
 
-            if pagerExpanded {
-                HStack(spacing: 12) {
-                    Button {
-                        goToPage(currentPage - 1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 34)
-                            .contentShape(Rectangle())
-                    }
-                    .disabled(currentPage == 0 || isLoadingPage)
-                    .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
-
-                    if isLoadingPage {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 58, height: 34)
-                    } else {
-                        Button {
-                            jumpText = "\(currentPage + 1)"
-                            showJump = true
-                        } label: {
-                            Text("\(currentPage + 1) / \(loadedPageCount)")
-                                .font(.footnote.weight(.semibold))
-                                .monospacedDigit()
-                                .frame(minWidth: 58, minHeight: 34)
-                        }
-                    }
-
-                    Button {
-                        goToPage(currentPage + 1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 30, height: 34)
-                            .contentShape(Rectangle())
-                    }
-                    .disabled(!canGoNext || isLoadingPage)
-                    .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
+            if isLoadingPage {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 64, height: 32)
+            } else {
+                Button {
+                    jumpText = "\(currentPage + 1)"
+                    showJump = true
+                } label: {
+                    Text("\(currentPage + 1) / \(loadedPageCount)")
+                        .font(.footnote.weight(.semibold))
+                        .monospacedDigit()
+                        .frame(minWidth: 64, minHeight: 32)
                 }
-                .buttonStyle(.plain)
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
 
-            Spacer(minLength: 0)
+            Button {
+                goToPage(currentPage + 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!canGoNext || isLoadingPage)
+            .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 5)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 7)
         .background(Color(uiColor: .systemGroupedBackground))
         .background {
             Color.clear
