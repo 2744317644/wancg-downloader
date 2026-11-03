@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import ImageIO
+import CryptoKit
 
 @MainActor
 final class HomeFeedModel: ObservableObject {
@@ -108,6 +109,7 @@ final class CoverImageStore {
 
     private let cache = NSCache<NSURL, UIImage>()
     private let limiter: CoverLimiter
+    private let coverCacheDirectory: URL
     private var client: WnacgClient?
 
     private init() {
@@ -115,6 +117,15 @@ final class CoverImageStore {
             forKey: Self.concurrencyKey
         ) as? Int ?? 3
         limiter = CoverLimiter(limit: saved)
+        let caches = FileManager.default.urls(
+            for: .cachesDirectory, in: .userDomainMask
+        ).first ?? FileManager.default.temporaryDirectory
+        coverCacheDirectory = caches.appendingPathComponent(
+            "CoverThumbnails", isDirectory: true
+        )
+        try? FileManager.default.createDirectory(
+            at: coverCacheDirectory, withIntermediateDirectories: true
+        )
         cache.countLimit = 120
         cache.totalCostLimit = 48 * 1024 * 1024
     }
@@ -129,7 +140,23 @@ final class CoverImageStore {
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
-        await loadImage(for: url, referer: referer)
+        if let cached = cache.object(forKey: url as NSURL) {
+            return cached
+        }
+
+        let directory = coverCacheDirectory
+        if let diskImage = await Task.detached(priority: .utility, operation: {
+            Self.readThumbnail(for: url, in: directory)
+        }).value {
+            cache.setObject(
+                diskImage,
+                forKey: url as NSURL,
+                cost: Int(diskImage.size.width * diskImage.size.height * 4)
+            )
+            return diskImage
+        }
+
+        return await loadImage(for: url, referer: referer)
     }
 
     private func loadImage(for url: URL, referer: URL) async -> UIImage? {
@@ -160,10 +187,35 @@ final class CoverImageStore {
             guard let image else { return nil }
             let cost = Int(image.size.width * image.size.height * 4)
             cache.setObject(image, forKey: url as NSURL, cost: cost)
+
+            if let thumbnail = image.jpegData(compressionQuality: 0.82) {
+                let directory = coverCacheDirectory
+                Task.detached(priority: .utility) {
+                    let destination = Self.diskURL(for: url, in: directory)
+                    try? thumbnail.write(to: destination, options: .atomic)
+                }
+            }
             return image
         } catch {
             return nil
         }
+    }
+
+    nonisolated private static func diskURL(for url: URL, in directory: URL) -> URL {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return directory.appendingPathComponent(name + ".jpg")
+    }
+
+    nonisolated private static func readThumbnail(
+        for url: URL,
+        in directory: URL
+    ) -> UIImage? {
+        let path = diskURL(for: url, in: directory).path
+        guard FileManager.default.fileExists(atPath: path) else {
+            return nil
+        }
+        return UIImage(contentsOfFile: path)
     }
 
     nonisolated private static func downsample(_ data: Data) -> UIImage? {
