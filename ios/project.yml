@@ -64,6 +64,23 @@ targets:
         ENABLE_BITCODE: NO
         SUPPORTS_MACCATALYST: NO
 
+  WnacgDownloaderUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: UITests
+    dependencies:
+      - target: WnacgDownloader
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wancg.downloader.uitests
+        TEST_TARGET_NAME: WnacgDownloader
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+
   WnacgWidgets:
     type: app-extension
     platform: iOS
@@ -126,6 +143,10 @@ schemes:
       config: Debug
     archive:
       config: Release
+    test:
+      config: Debug
+      targets:
+        - WnacgDownloaderUITests
   WnacgProxyCheck:
     build:
       targets:
