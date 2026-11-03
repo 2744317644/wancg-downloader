@@ -9,6 +9,9 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation.git
     from: 0.9.19
+  Kingfisher:
+    url: https://github.com/onevcat/Kingfisher.git
+    from: 8.9.0
 
 targets:
   WnacgDownloader:
@@ -20,6 +23,7 @@ targets:
       - path: Resources
     dependencies:
       - package: ZIPFoundation
+      - package: Kingfisher
       - sdk: PDFKit.framework
       - sdk: ActivityKit.framework
       - target: WnacgWidgets
@@ -28,8 +32,8 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: wnacg
-        CFBundleShortVersionString: "1.16.3"
-        CFBundleVersion: "229"
+        CFBundleShortVersionString: "1.17.0"
+        CFBundleVersion: "230"
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIFileSharingEnabled: true
@@ -53,8 +57,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wancg.downloader
-        MARKETING_VERSION: "1.16.3"
-        CURRENT_PROJECT_VERSION: "229"
+        MARKETING_VERSION: "1.17.0"
+        CURRENT_PROJECT_VERSION: "230"
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO
@@ -79,8 +83,8 @@ targets:
       path: Widgets/Info.plist
       properties:
         CFBundleDisplayName: wnacg 下载
-        CFBundleShortVersionString: "1.16.3"
-        CFBundleVersion: "229"
+        CFBundleShortVersionString: "1.17.0"
+        CFBundleVersion: "230"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
