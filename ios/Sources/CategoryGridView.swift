@@ -234,9 +234,9 @@ struct CategoryGridView: UIViewRepresentable {
         private func finishScrolling() {
             CoverImageStore.shared.setScrolling(false)
             guard let collectionView else { return }
-            let visible = collectionView.indexPathsForVisibleItems
-            UIView.performWithoutAnimation {
-                collectionView.reloadItems(at: visible)
+            for indexPath in collectionView.indexPathsForVisibleItems {
+                (collectionView.cellForItem(at: indexPath) as? AlbumGridCell)?
+                    .resumeImageLoad()
             }
         }
 
@@ -341,6 +341,9 @@ private final class AlbumGridCell: UICollectionViewCell {
     }
 
     func configure(with album: HomeAlbum) {
+        if self.album?.aid == album.aid, coverView.image != nil {
+            return
+        }
         self.album = album
         titleLabel.text = album.title
         var bits: [String] = []
@@ -352,16 +355,32 @@ private final class AlbumGridCell: UICollectionViewCell {
         }
         metaLabel.text = bits.joined(separator: " · ")
         coverView.image = nil
-
         task?.cancel()
-        guard !CoverImageStore.shared.suppressLoads else { return }
-        guard let url = album.coverURL else { return }
+        startImageLoad()
+    }
+
+    func resumeImageLoad() {
+        guard coverView.image == nil else { return }
+        task?.cancel()
+        startImageLoad()
+    }
+
+    private func startImageLoad() {
+        guard !CoverImageStore.shared.suppressLoads,
+              let album,
+              let url = album.coverURL else {
+            return
+        }
         let aid = album.aid
         task = Task { @MainActor [weak self] in
             let image = await CoverImageStore.shared.image(
                 for: url, referer: album.pageURL
             )
-            guard !Task.isCancelled, self?.album?.aid == aid else { return }
+            guard !Task.isCancelled,
+                  !CoverImageStore.shared.suppressLoads,
+                  self?.album?.aid == aid else {
+                return
+            }
             self?.coverView.image = image
         }
     }
