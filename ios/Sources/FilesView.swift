@@ -98,17 +98,7 @@ struct FilesView: View {
                 load()
             }
             .sheet(item: $preview) { item in
-                NavigationStack {
-                    PDFKitView(url: item.url)
-                        .ignoresSafeArea(edges: .bottom)
-                        .navigationTitle(item.url.lastPathComponent)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("完成") { preview = nil }
-                            }
-                        }
-                }
+                PDFPreviewView(url: item.url)
             }
             .onAppear(perform: load)
             .onReceive(
@@ -176,8 +166,168 @@ struct FilesView: View {
     }
 }
 
-private struct PDFKitView: UIViewRepresentable {
+@MainActor
+private final class PDFEditorModel: ObservableObject {
     let url: URL
+    let document: PDFDocument?
+    @Published var currentPageIndex = 0
+    @Published private(set) var pageCount = 0
+    @Published var errorMessage: String?
+
+    init(url: URL) {
+        self.url = url
+        let document = PDFDocument(url: url)
+        self.document = document
+        pageCount = document?.pageCount ?? 0
+    }
+
+    func deleteCurrentPage() -> Bool {
+        guard let document, document.pageCount > 1,
+              currentPageIndex >= 0,
+              currentPageIndex < document.pageCount else {
+            errorMessage = "当前 PDF 只剩一页，不能删除。"
+            return false
+        }
+
+        document.removePage(at: currentPageIndex)
+        pageCount = document.pageCount
+        currentPageIndex = min(currentPageIndex, pageCount - 1)
+
+        guard let data = document.dataRepresentation() else {
+            errorMessage = "无法重新生成 PDF 数据。"
+            return false
+        }
+        do {
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+}
+
+private struct PDFPreviewView: View {
+    let url: URL
+    @StateObject private var model: PDFEditorModel
+    @State private var isEditing = false
+    @State private var showDeleteConfirmation = false
+    @Environment(\.dismiss) private var dismiss
+
+    init(url: URL) {
+        self.url = url
+        _model = StateObject(wrappedValue: PDFEditorModel(url: url))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let document = model.document {
+                    PDFKitView(
+                        document: document,
+                        currentPageIndex: $model.currentPageIndex
+                    )
+                    .id(model.pageCount)
+                    .ignoresSafeArea(edges: .bottom)
+                    .safeAreaInset(edge: .bottom) {
+                        if isEditing, model.pageCount > 0 {
+                            editBar
+                        }
+                    }
+                } else {
+                    ContentUnavailableView(
+                        "无法打开 PDF",
+                        systemImage: "doc.richtext",
+                        description: Text("文件可能已损坏")
+                    )
+                }
+            }
+            .navigationTitle(url.lastPathComponent)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(isEditing ? "完成编辑" : "编辑") {
+                        isEditing.toggle()
+                    }
+                    .disabled(model.document == nil || model.pageCount == 0)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("关闭") { dismiss() }
+                }
+            }
+            .alert("删除当前页？", isPresented: $showDeleteConfirmation) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    if model.deleteCurrentPage() {
+                        NotificationCenter.default.post(
+                            name: .downloadsChanged, object: nil
+                        )
+                    }
+                }
+            } message: {
+                Text("第 \(model.currentPageIndex + 1) 页，共 \(model.pageCount) 页")
+            }
+            .alert(
+                "编辑失败",
+                isPresented: Binding(
+                    get: { model.errorMessage != nil },
+                    set: { if !$0 { model.errorMessage = nil } }
+                )
+            ) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text(model.errorMessage ?? "")
+            }
+        }
+    }
+
+    private var editBar: some View {
+        HStack(spacing: 14) {
+            Button {
+                model.currentPageIndex = max(0, model.currentPageIndex - 1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(model.currentPageIndex == 0)
+
+            Text("第 \(model.currentPageIndex + 1) / \(model.pageCount) 页")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 88)
+
+            Button {
+                model.currentPageIndex = min(
+                    model.pageCount - 1, model.currentPageIndex + 1
+                )
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(model.currentPageIndex >= model.pageCount - 1)
+
+            Spacer(minLength: 4)
+
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label("删除本页", systemImage: "trash")
+            }
+            .disabled(model.pageCount <= 1)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+    }
+}
+
+private struct PDFKitView: UIViewRepresentable {
+    let document: PDFDocument
+    @Binding var currentPageIndex: Int
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
 
     func makeUIView(context: Context) -> PDFView {
         let view = PDFView()
@@ -185,9 +335,63 @@ private struct PDFKitView: UIViewRepresentable {
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
         view.backgroundColor = UIColor(red: 0.04, green: 0.06, blue: 0.10, alpha: 1)
-        view.document = PDFDocument(url: url)
+        view.document = document
+        context.coordinator.observe(view)
+        showCurrentPage(in: view)
         return view
     }
 
-    func updateUIView(_ view: PDFView, context: Context) {}
+    func updateUIView(_ view: PDFView, context: Context) {
+        context.coordinator.parent = self
+        if view.document !== document {
+            view.document = document
+        }
+        showCurrentPage(in: view)
+    }
+
+    static func dismantleUIView(_ uiView: PDFView, coordinator: Coordinator) {
+        coordinator.stopObserving()
+    }
+
+    private func showCurrentPage(in view: PDFView) {
+        guard document.pageCount > 0 else { return }
+        let index = min(max(0, currentPageIndex), document.pageCount - 1)
+        guard let page = document.page(at: index),
+              view.currentPage !== page else { return }
+        view.go(to: page)
+    }
+
+    final class Coordinator: NSObject {
+        var parent: PDFKitView
+
+        init(_ parent: PDFKitView) {
+            self.parent = parent
+        }
+
+        func observe(_ view: PDFView) {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(pageChanged(_:)),
+                name: .PDFViewPageChanged,
+                object: view
+            )
+        }
+
+        func stopObserving() {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        @objc private func pageChanged(_ notification: Notification) {
+            guard let view = notification.object as? PDFView,
+                  let page = view.currentPage,
+                  let document = view.document else {
+                return
+            }
+            let index = document.index(for: page)
+            guard index != parent.currentPageIndex else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.currentPageIndex = index
+            }
+        }
+    }
 }
