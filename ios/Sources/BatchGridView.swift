@@ -351,13 +351,13 @@ private final class AlbumGridCell: UICollectionViewCell {
             options: [
                 .processor(
                     DownsamplingImageProcessor(
-                        size: CGSize(width: 360, height: 480)
+                        // 120x160 points at 3x = 360x480 pixels.
+                        size: CGSize(width: 120, height: 160)
                     )
                 ),
                 .scaleFactor(UIScreen.main.scale),
                 .backgroundDecode,
                 .requestModifier(modifier),
-                .transition(.fade(0.15)),
             ]
         )
     }
