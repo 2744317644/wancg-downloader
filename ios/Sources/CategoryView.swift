@@ -99,6 +99,7 @@ struct CategoryView: View {
     @State private var jumpText = ""
     private let pageSize = 9
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var chrome: AppChrome
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -140,11 +141,6 @@ struct CategoryView: View {
         .navigationDestination(item: $selectedAlbum) { album in
             AlbumDetailView(album: album)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !visibleAlbums.isEmpty {
-                floatingBar
-            }
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 MangaFilterMenu()
@@ -161,6 +157,37 @@ struct CategoryView: View {
         }
         .task {
             await loadFirstPage()
+        }
+        .onAppear {
+            chrome.isCategoryActive = true
+            syncChrome()
+        }
+        .onDisappear {
+            chrome.isCategoryActive = false
+        }
+        .onChange(of: chromeKey) { _, _ in
+            syncChrome()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .categoryHomeRequested)
+        ) { _ in
+            dismiss()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .categoryPreviousRequested)
+        ) { _ in
+            goToPage(currentPage - 1)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .categoryNextRequested)
+        ) { _ in
+            goToPage(currentPage + 1)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .categoryJumpRequested)
+        ) { _ in
+            jumpText = "\(currentPage + 1)"
+            showJump = true
         }
         .onChange(of: languageFilter) { _, _ in
             resetToFirstPage()
@@ -233,77 +260,15 @@ struct CategoryView: View {
         visibleAlbums.count > (currentPage + 1) * pageSize || model.hasMore
     }
 
-    private var floatingBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                dismiss()
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("首页")
-                        .font(.subheadline.weight(.medium))
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 50)
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .modifier(CategoryGlassCapsule())
-            .accessibilityLabel("返回首页")
+    private var chromeKey: String {
+        "\(currentPage)|\(isLoadingPage)|\(canGoNext)|\(visibleAlbums.count)|\(model.hasMore)"
+    }
 
-            Spacer(minLength: 0)
-
-            HStack(spacing: 2) {
-                Button {
-                    goToPage(currentPage - 1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 44, height: 40)
-                        .contentShape(Rectangle())
-                }
-                .disabled(currentPage == 0 || isLoadingPage)
-                .opacity(currentPage == 0 || isLoadingPage ? 0.35 : 1)
-
-                if isLoadingPage {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 116, height: 40)
-                } else {
-                    Button {
-                        jumpText = "\(currentPage + 1)"
-                        showJump = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("第 \(currentPage + 1) 页")
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 8, weight: .semibold))
-                        }
-                        .frame(width: 116, height: 40)
-                    }
-                }
-
-                Button {
-                    goToPage(currentPage + 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 44, height: 40)
-                        .contentShape(Rectangle())
-                }
-                .disabled(!canGoNext || isLoadingPage)
-                .opacity(!canGoNext || isLoadingPage ? 0.35 : 1)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .frame(height: 50)
-            .modifier(CategoryGlassCapsule())
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+    private func syncChrome() {
+        chrome.currentPage = currentPage
+        chrome.canGoPrevious = currentPage > 0 && !isLoadingPage
+        chrome.canGoNext = canGoNext && !isLoadingPage
+        chrome.isLoadingPage = isLoadingPage
     }
 
     private func loadFirstPage() async {
@@ -396,19 +361,5 @@ struct CategoryView: View {
     private var background: some View {
         Color(uiColor: .systemGroupedBackground)
             .ignoresSafeArea()
-    }
-}
-
-private struct CategoryGlassCapsule: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
-        }
     }
 }
