@@ -337,7 +337,11 @@ struct CategoryView: View {
 
     private func goToPage(_ page: Int) {
         guard page >= 0, !isLoadingPage else { return }
-        if page * pageSize < visibleAlbums.count {
+        let pageEnd = (page + 1) * pageSize
+        let hasEnoughForPage = visibleAlbums.count >= pageEnd
+            || !model.hasMore
+        if page * pageSize < visibleAlbums.count,
+           hasEnoughForPage {
             withAnimation(.easeInOut(duration: 0.18)) {
                 currentPage = page
             }
