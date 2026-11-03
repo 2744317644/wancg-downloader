@@ -110,6 +110,7 @@ final class CoverImageStore {
     private let limiter: CoverLimiter
     private var requests: [URL: Task<UIImage?, Never>] = [:]
     private var client: WnacgClient?
+    private(set) var suppressLoads = false
 
     private init() {
         let saved = UserDefaults.standard.object(
@@ -123,6 +124,10 @@ final class CoverImageStore {
     func setConcurrency(_ value: Int) {
         let clamped = min(6, max(1, value))
         Task { await limiter.updateLimit(clamped) }
+    }
+
+    func setScrolling(_ scrolling: Bool) {
+        suppressLoads = scrolling
     }
 
     func image(for url: URL, referer: URL) async -> UIImage? {
@@ -144,7 +149,8 @@ final class CoverImageStore {
     }
 
     func prefetch(for url: URL, referer: URL) {
-        guard cache.object(forKey: url as NSURL) == nil,
+        guard !suppressLoads,
+              cache.object(forKey: url as NSURL) == nil,
               requests[url] == nil else {
             return
         }
