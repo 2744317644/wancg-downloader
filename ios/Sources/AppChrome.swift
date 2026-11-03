@@ -108,6 +108,7 @@ struct AppBottomBar: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .modifier(ChromeGlassCapsule())
             .accessibilityLabel("返回首页")
 
             Spacer(minLength: 0)
@@ -164,10 +165,9 @@ struct AppBottomBar: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 4)
+            .frame(height: 42)
+            .modifier(ChromeGlassCapsule())
         }
-        .padding(.horizontal, 12)
-        .frame(height: 56)
-        .modifier(ChromeGlassCapsule())
     }
 }
 
