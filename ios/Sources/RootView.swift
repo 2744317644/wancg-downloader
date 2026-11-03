@@ -54,10 +54,18 @@ struct RootView: View {
                 ProxySession.shared.restart()
             }
         }
-        .onChange(of: selection) { _, newValue in
-            if newValue != 4 {
-                settingsID = UUID()
-            }
+        .background {
+            TabBarReselectObserver(
+                onReselect: { index in
+                    if index == 4 {
+                        settingsID = UUID()
+                    }
+                },
+                onSelect: { index in
+                    selection = index
+                }
+            )
+            .frame(width: 0, height: 0)
         }
         .overlay(alignment: .topTrailing) {
             if showFPS {
