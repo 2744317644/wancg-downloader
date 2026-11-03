@@ -38,7 +38,7 @@ struct RootView: View {
 
         Group {
             if #available(iOS 26.0, *) {
-                tabs.tabBarMinimizeBehavior(.onScrollDown)
+                tabs.tabBarMinimizeBehavior(.never)
             } else {
                 tabs
             }
