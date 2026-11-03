@@ -97,11 +97,6 @@ struct CategoryView: View {
     @State private var isLoadingBatch = false
     private let batchSize = 18
 
-    private let columns = Array(
-        repeating: GridItem(.flexible(), spacing: 10),
-        count: 3
-    )
-
     init(
         title: String,
         startURL: URL,
@@ -113,44 +108,15 @@ struct CategoryView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(displayedAlbums) { album in
-                    NavigationLink {
-                        AlbumDetailView(album: album)
-                    } label: {
-                        AlbumCardView(album: album)
-                    }
-                    .buttonStyle(.plain)
-                    .onAppear {
-                        if album.aid == displayedAlbums.last?.aid {
-                            loadNextBatchIfNeeded()
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-
-            if isLoadingBatch || (model.isLoading && displayedCount > 0) {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("加载中…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 18)
-            }
-
-            Color.clear
-                .frame(height: 1)
-                .onAppear {
-                    loadNextBatchIfNeeded()
-                }
-        }
-        .refreshable {
-            await reloadFirstBatch()
-        }
+        BatchGridView(
+            albums: displayedAlbums,
+            isLoading: isLoadingBatch,
+            hasMore: model.hasMore || displayedCount < visibleAlbums.count,
+            datasetKey: "\(selectedLanguage.rawValue)|\(hideAI)",
+            reloadToken: model.resetGeneration,
+            onSelect: { selectedAlbum = $0 },
+            onLoadMore: { loadNextBatchIfNeeded() }
+        )
         .background(background)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
