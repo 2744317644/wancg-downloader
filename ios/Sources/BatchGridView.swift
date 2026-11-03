@@ -7,6 +7,8 @@ struct BatchGridView: UIViewRepresentable {
     let hasMore: Bool
     let datasetKey: String
     let reloadToken: Int
+    let topInset: CGFloat
+    let bottomInset: CGFloat
     let onSelect: (HomeAlbum) -> Void
     let onLoadMore: () -> Void
 
@@ -25,7 +27,13 @@ struct BatchGridView: UIViewRepresentable {
         let collectionView = UICollectionView(
             frame: .zero, collectionViewLayout: layout
         )
-        collectionView.backgroundColor = .systemGroupedBackground
+        collectionView.backgroundColor = .clear
+        collectionView.isOpaque = false
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.contentInset = UIEdgeInsets(
+            top: topInset, left: 0, bottom: bottomInset, right: 0
+        )
+        collectionView.scrollIndicatorInsets = collectionView.contentInset
         collectionView.alwaysBounceVertical = true
         collectionView.indicatorStyle = .default
         collectionView.register(
@@ -46,6 +54,13 @@ struct BatchGridView: UIViewRepresentable {
     }
 
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        let insets = UIEdgeInsets(
+            top: topInset, left: 0, bottom: bottomInset, right: 0
+        )
+        if collectionView.contentInset != insets {
+            collectionView.contentInset = insets
+            collectionView.scrollIndicatorInsets = insets
+        }
         context.coordinator.apply(from: self)
     }
 
