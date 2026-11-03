@@ -4,6 +4,7 @@ struct RootView: View {
     @StateObject private var downloadModel = AppModel()
     @State private var selection = 0
     @State private var settingsID = UUID()
+    @AppStorage("debug.showFPS") private var showFPS = false
 
     var body: some View {
         let tabs = TabView(selection: $selection) {
@@ -56,6 +57,13 @@ struct RootView: View {
         .onChange(of: selection) { _, newValue in
             if newValue != 4 {
                 settingsID = UUID()
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showFPS {
+                PerformanceHUD()
+                    .padding(.top, 8)
+                    .padding(.trailing, 12)
             }
         }
     }
