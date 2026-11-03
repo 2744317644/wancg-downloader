@@ -98,7 +98,6 @@ struct CategoryView: View {
     @State private var showJump = false
     @State private var jumpText = ""
     private let pageSize = 9
-    @Environment(\.dismiss) private var dismiss
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -234,24 +233,7 @@ struct CategoryView: View {
     }
 
     private var floatingBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                dismiss()
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("首页")
-                        .font(.subheadline.weight(.medium))
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 50)
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .modifier(CategoryGlassCapsule())
-            .accessibilityLabel("返回首页")
-
+        HStack(spacing: 0) {
             Spacer(minLength: 0)
 
             HStack(spacing: 2) {
