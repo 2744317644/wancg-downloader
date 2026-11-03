@@ -66,13 +66,13 @@ struct HomeCover: View {
                 }
                 .setProcessor(
                     DownsamplingImageProcessor(
-                        size: CGSize(width: 360, height: 480)
+                        // 180x240 points at 3x = 540x720 pixels.
+                        size: CGSize(width: 180, height: 240)
                     )
                 )
                 .scaleFactor(UIScreen.main.scale)
                 .backgroundDecode()
                 .requestModifier(coverModifier)
-                .fade(duration: 0.15)
                 .resizable()
                 .scaledToFill()
         }
