@@ -131,50 +131,64 @@ final class CategoryScreenUITests: XCTestCase {
 
         var counts: [Int] = []
         var hitEnd = false
-        for round in 0..<4 {
+        var loadFailed = false
+        for round in 0..<3 {
             let reachedFooter = scrollToFooter(app)
             XCTAssertTrue(reachedFooter, "footer not reachable in load-more round \(round)")
             if !reachedFooter { break }
             if let count = loadedAlbumCount(app) {
                 counts.append(count)
-                print("LOAD_MORE_ROUND \(round) BEFORE COUNT \(count)")
+                print("AUTO_LOAD_ROUND \(round) BEFORE COUNT \(count)")
             }
             if endReached(app) {
                 hitEnd = true
                 break
             }
-            // Tap the footer's explicit control. This also proves the manual
-            // recovery path a user has when they do not want to keep swiping.
-            let loadMore = app.buttons["load-more-button"].firstMatch
-            if loadMore.exists {
-                loadMore.tap()
-            } else {
+            // IMPORTANT: never tap the footer button here. Scrolling to the
+            // last row itself must trigger the next page automatically; that
+            // is exactly the regression the user reported.
+            var grew = false
+            for attempt in 0..<10 {
+                waitForFooterToSettle(app)
+                if let errorText = loadMoreErrorText(app) {
+                    print("LOAD_MORE_ERROR_ROUND \(round): \(errorText)")
+                    capture(name: "ui-08-load-error-round-\(round)")
+                    XCTFail("load-more failed in round \(round): \(errorText)")
+                    loadFailed = true
+                    break
+                }
+                _ = scrollToFooter(app)
+                if let count = loadedAlbumCount(app),
+                   let last = counts.last, count > last {
+                    counts.append(count)
+                    print("AUTO_LOAD_ROUND \(round) AFTER COUNT \(count) (attempt \(attempt))")
+                    grew = true
+                    break
+                }
+                if endReached(app) {
+                    hitEnd = true
+                    break
+                }
+                // Nudge the list so the last-row cells enter the lazy grid's
+                // render window; this is the user's normal swipe-down gesture.
                 app.swipeUp()
+                sleep(1)
             }
-            waitForFooterToSettle(app)
-            _ = scrollToFooter(app)
-            if let count = loadedAlbumCount(app) {
-                counts.append(count)
-                print("LOAD_MORE_ROUND \(round) AFTER COUNT \(count)")
-            }
-            if let errorText = loadMoreErrorText(app) {
-                print("LOAD_MORE_ERROR_ROUND \(round): \(errorText)")
-                capture(name: "ui-08-load-error-round-\(round)")
-                XCTFail("load-more failed in round \(round): \(errorText)")
-                break
-            }
-            if endReached(app) {
-                hitEnd = true
-                break
-            }
-            capture(name: "ui-08-load-round-\(round)")
+            if loadFailed || hitEnd { break }
+            XCTAssertTrue(
+                grew,
+                "scrolling to the last row did NOT auto-load the next page "
+                    + "in round \(round) (only the footer button works)"
+            )
+            if !grew { break }
+            capture(name: "ui-08-auto-load-round-\(round)")
         }
-        print("LOAD_MORE_COUNTS: \(counts) hitEnd=\(hitEnd)")
-        if !hitEnd, counts.count >= 2,
+        print("AUTO_LOAD_COUNTS: \(counts) hitEnd=\(hitEnd)")
+        if !hitEnd, !loadFailed, counts.count >= 2,
            let first = counts.first, let last = counts.last {
             XCTAssertGreaterThan(
                 last, first,
-                "album count should grow across load-more rounds"
+                "album count should grow across automatic load-more rounds"
             )
         }
 
@@ -195,12 +209,29 @@ final class CategoryScreenUITests: XCTestCase {
     // MARK: Load-more helpers
 
     private func scrollToFooter(_ app: XCUIApplication) -> Bool {
-        for _ in 0..<14 {
-            if footerElement(app) != nil { return true }
+        for _ in 0..<20 {
+            if footerOnScreen(app) != nil { return true }
             app.swipeUp()
-            usleep(700_000)
+            usleep(500_000)
         }
-        return footerElement(app) != nil
+        return footerOnScreen(app) != nil
+    }
+
+    private func footerOnScreen(_ app: XCUIApplication) -> XCUIElement? {
+        guard let footer = footerElement(app) else { return nil }
+        return isOnScreen(footer, in: app) ? footer : nil
+    }
+
+    /// Off-screen SwiftUI content can still exist in the accessibility tree,
+    /// so `exists` alone is not enough to decide we reached the footer.
+    private func isOnScreen(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        guard frame.width > 0, frame.height > 0 else { return false }
+        return frame.intersects(app.windows.firstMatch.frame)
     }
 
     private func footerElement(_ app: XCUIApplication) -> XCUIElement? {

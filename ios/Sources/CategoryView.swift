@@ -174,6 +174,12 @@ struct CategoryView: View {
     @State private var isAutoFilling = false
     @State private var isRefreshing = false
 
+    /// How many albums before the current end prefetching starts. Two rows on
+    /// an iPhone: the next site page is normally in place before the user can
+    /// see the final row, so that row is already filled with new covers
+    /// instead of showing a single orphaned card above the footer.
+    private static let prefetchDistance = 6
+
     private var columns: [GridItem] {
         let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 160 : 104
         let maximum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 220 : 154
@@ -272,26 +278,15 @@ struct CategoryView: View {
         } else {
             albumGrid
             footer
-            loadMoreSentinel
-        }
-    }
-
-    /// Stable bottom sentinel: no `.id(...)` recreation, so a successful page
-    /// append cannot instantly retrigger itself. It only fires again after the
-    /// lazy view legitimately re-appears when the user scrolls back to the end.
-    @ViewBuilder
-    private var loadMoreSentinel: some View {
-        if model.hasMore {
-            Color.clear
-                .frame(height: 1)
-                .accessibilityHidden(true)
-                .onAppear { requestMore() }
         }
     }
 
     private var albumGrid: some View {
         LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(visibleAlbums) { album in
+            ForEach(
+                Array(visibleAlbums.enumerated()),
+                id: \.element.id
+            ) { index, album in
                 NavigationLink {
                     AlbumDetailView(album: album)
                 } label: {
@@ -300,6 +295,15 @@ struct CategoryView: View {
                     AlbumCardView(album: album).equatable()
                 }
                 .buttonStyle(AlbumCardButtonStyle())
+                .onAppear {
+                    // Prefetch when the last rows come into the lazy grid's
+                    // render window. Unlike a sentinel in the outer VStack,
+                    // these cells only appear when the user actually scrolls
+                    // near the bottom — and they re-arm for every new page.
+                    if index >= visibleAlbums.count - Self.prefetchDistance {
+                        requestMore()
+                    }
+                }
             }
         }
         .padding(.top, 4)
