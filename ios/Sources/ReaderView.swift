@@ -45,7 +45,11 @@ final class ReaderModel: ObservableObject {
     func reload() async {
         loaded = false
         pageURLs = []
-        ProxySession.shared.restart()
+        // Restart the local proxy off the main actor: it can block on the
+        // listener semaphore and the reader should not hitch.
+        await Task.detached(priority: .userInitiated) {
+            ProxySession.shared.restart()
+        }.value
         await load()
     }
 
@@ -276,6 +280,15 @@ struct ReaderView: View {
                 .padding(.trailing, 2)
                 .opacity(model.pageURLs.isEmpty ? 0 : 1)
         }
+        .overlay(alignment: .bottom) {
+            if !model.pageURLs.isEmpty {
+                ReaderProgressHUD(
+                    controller: scrollController,
+                    pageCount: model.pageURLs.count
+                )
+                .padding(.bottom, 18)
+            }
+        }
         .background(Color.black.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -341,6 +354,52 @@ struct ReaderView: View {
         }
         .onDisappear {
             ReaderImageStore.shared.cancelPrefetch()
+        }
+    }
+}
+
+/// Floats a small "37% · 共 126P" pill while scrolling, then fades out so the
+/// reader stays immersive. The percentage is derived from the real scroll
+/// offset, so it stays correct even though page heights differ.
+private struct ReaderProgressHUD: View {
+    @ObservedObject var controller: ReaderScrollController
+    let pageCount: Int
+
+    @State private var visible = false
+    @State private var hideTask: Task<Void, Never>?
+
+    private var percent: Int {
+        Int((controller.progress * 100).rounded())
+    }
+
+    var body: some View {
+        Text("\(percent)% · 共 \(pageCount)P")
+            .font(.caption.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+            )
+            .opacity(visible ? 1 : 0)
+            .animation(.easeInOut(duration: 0.2), value: visible)
+            .allowsHitTesting(false)
+            .accessibilityLabel("阅读进度 \(percent)%，共 \(pageCount) 页")
+            .onChange(of: controller.progress) { _, _ in
+                flash()
+            }
+            .onAppear { flash() }
+    }
+
+    private func flash() {
+        hideTask?.cancel()
+        visible = true
+        hideTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            visible = false
         }
     }
 }

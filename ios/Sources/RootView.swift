@@ -49,7 +49,11 @@ struct RootView: View {
             )
         ) { _ in
             if !downloadModel.hasActiveDownload {
-                ProxySession.shared.restart()
+                // Restarting the proxy blocks on a listener semaphore; keep it
+                // off the main actor right after returning from background.
+                Task.detached(priority: .utility) {
+                    ProxySession.shared.restart()
+                }
             }
         }
         .overlay(alignment: .topTrailing) {

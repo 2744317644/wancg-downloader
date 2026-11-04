@@ -21,7 +21,11 @@ struct WnacgApp: App {
         if !UserDefaults.standard.bool(
             forKey: ProxySession.systemNetworkKey
         ) {
-            _ = try? LocalProxy.shared.start()
+            // Warm the local proxy up in the background instead of blocking
+            // app launch on the listener semaphore.
+            Task.detached(priority: .userInitiated) {
+                ProxySession.shared.prepareIfNeeded()
+            }
         }
         Task { @MainActor in
             HighRefreshRateController.shared.applySavedSetting()

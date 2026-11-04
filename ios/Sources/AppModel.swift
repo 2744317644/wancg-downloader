@@ -28,6 +28,12 @@ final class AppModel: ObservableObject {
     private var lastProgressDate: Date?
     private var lastProgressBytes: Int64 = 0
     private var smoothedSpeed: Double = 0
+    // Progress callbacks fire per network chunk / per PDF page. Publishing
+    // every one of them re-renders several views and pushes a Live Activity
+    // update; throttle to a readable rate instead.
+    private var lastProgressPublish: Date?
+    private var lastLiveActivityUpdate: Date?
+    private var lastPDFPublish: Date?
 
     var hasActiveDownload: Bool {
         activeAid != nil || isBusy
@@ -46,6 +52,14 @@ final class AppModel: ObservableObject {
             return nil
         }
         return index + 1
+    }
+
+    func cancelQueued(_ aid: String) {
+        let before = queue.count
+        queue.removeAll { $0.aid == aid }
+        if queue.count != before {
+            persistQueue()
+        }
     }
 
     init() {
@@ -213,9 +227,14 @@ final class AppModel: ObservableObject {
         written: Int64,
         total: Int64
     ) {
-        downloadProgress = min(1, max(0, value)) * 0.7
-
         let now = Date()
+        let progress = min(1, max(0, value)) * 0.7
+        if value >= 1 || lastProgressPublish == nil
+            || now.timeIntervalSince(lastProgressPublish!) >= 0.1 {
+            downloadProgress = progress
+            lastProgressPublish = now
+        }
+
         if let lastDate = lastProgressDate {
             let elapsed = now.timeIntervalSince(lastDate)
             if elapsed >= 0.35 {
@@ -240,6 +259,31 @@ final class AppModel: ObservableObject {
         } else {
             downloadETA = nil
         }
+    }
+
+    private func publishLiveActivityProgress(_ value: Double) {
+        let now = Date()
+        guard value >= 1 || lastLiveActivityUpdate == nil
+                || now.timeIntervalSince(lastLiveActivityUpdate!) >= 0.5 else {
+            return
+        }
+        lastLiveActivityUpdate = now
+        DownloadLiveActivityManager.shared.update(
+            progress: value * 0.7, status: "正在下载 ZIP…"
+        )
+    }
+
+    private func publishPDFProgress(_ value: Double) {
+        let now = Date()
+        guard value >= 1 || lastPDFPublish == nil
+                || now.timeIntervalSince(lastPDFPublish!) >= 0.15 else {
+            return
+        }
+        lastPDFPublish = now
+        pdfProgress = value
+        DownloadLiveActivityManager.shared.update(
+            progress: value, status: "正在生成 PDF…"
+        )
     }
 
     private func processNext() {
@@ -277,6 +321,9 @@ final class AppModel: ObservableObject {
         lastProgressDate = nil
         lastProgressBytes = 0
         smoothedSpeed = 0
+        lastProgressPublish = nil
+        lastLiveActivityUpdate = nil
+        lastPDFPublish = nil
         status = "正在获取下载地址…"
         beginBackgroundTask()
         DownloadLiveActivityManager.shared.start(
@@ -302,9 +349,7 @@ final class AppModel: ObservableObject {
                     self.updateDownloadMetrics(
                         value: value, written: written, total: total
                     )
-                    DownloadLiveActivityManager.shared.update(
-                        progress: value * 0.7, status: "正在下载 ZIP…"
-                    )
+                    self.publishLiveActivityProgress(value)
                 }
             }
             zipURL = downloaded
@@ -347,10 +392,7 @@ final class AppModel: ObservableObject {
                             let value = total > 0
                                 ? 0.7 + 0.3 * Double(current) / Double(total)
                                 : 0.7
-                            self.pdfProgress = value
-                            DownloadLiveActivityManager.shared.update(
-                                progress: value, status: "正在生成 PDF…"
-                            )
+                            self.publishPDFProgress(value)
                         }
                     }
                 }.value

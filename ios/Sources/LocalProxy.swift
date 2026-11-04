@@ -298,6 +298,15 @@ final class ProxySession {
     private let restartLock = NSLock()
     private var isRestarting = false
 
+    // Lazy proxy startup: the synchronous `LocalProxy.start()` used to run
+    // inside this initializer, which runs on the main actor the first time a
+    // model touches ProxySession — up to a 5 s UI freeze. Startup now happens
+    // on the first background network call (or a background warm-up task) and
+    // concurrent callers wait on a condition instead of touching a placeholder.
+    private let prepareCondition = NSCondition()
+    private var needsPrepare = false
+    private var isPreparing = false
+
     private init() {
         useSystemNetwork = UserDefaults.standard.bool(
             forKey: ProxySession.systemNetworkKey
@@ -306,8 +315,31 @@ final class ProxySession {
             _session = ProxySession.makeSystemSession()
         } else {
             _session = URLSession(configuration: .default)
-            rebuild(invalidate: false)
+            needsPrepare = true
         }
+    }
+
+    /// Start the local proxy if it has not been started yet. Must only be
+    /// called off the main actor; it blocks until the listener is ready.
+    func prepareIfNeeded() {
+        prepareCondition.lock()
+        if !needsPrepare {
+            while isPreparing {
+                prepareCondition.wait()
+            }
+            prepareCondition.unlock()
+            return
+        }
+        needsPrepare = false
+        isPreparing = true
+        prepareCondition.unlock()
+
+        rebuild(invalidate: false)
+
+        prepareCondition.lock()
+        isPreparing = false
+        prepareCondition.broadcast()
+        prepareCondition.unlock()
     }
 
     private func replaceSession(_ new: URLSession) {

@@ -43,6 +43,7 @@ struct AlbumDetailView: View {
     @State private var didCopyTitle = false
     @State private var downloadStartedHere = false
     @State private var showReader = false
+    @State private var tagsExpanded = false
     @AppStorage("content.hideAI") private var hideAI = false
     @StateObject private var model: AlbumDetailModel
 
@@ -57,6 +58,10 @@ struct AlbumDetailView: View {
 
     private var tags: [String] {
         model.preview?.tags ?? []
+    }
+
+    private var displayedTags: [String] {
+        tagsExpanded ? tags : Array(tags.prefix(8))
     }
 
     var body: some View {
@@ -317,6 +322,8 @@ struct AlbumDetailView: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(Color.primary.opacity(0.06), in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     private var tagGrid: some View {
@@ -327,7 +334,7 @@ struct AlbumDetailView: View {
                 alignment: .leading,
                 spacing: 8
             ) {
-                ForEach(tags, id: \.self) { tag in
+                ForEach(displayedTags, id: \.self) { tag in
                     if let searchURL = HomeParser.searchURL(tag) {
                         NavigationLink {
                             CategoryView(
@@ -342,6 +349,22 @@ struct AlbumDetailView: View {
                         tagChip(tag)
                     }
                 }
+            }
+            if tags.count > 8 {
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        tagsExpanded.toggle()
+                    }
+                } label: {
+                    Text(tagsExpanded
+                        ? "收起标签"
+                        : "展开全部 \(tags.count) 个标签")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.mint)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }

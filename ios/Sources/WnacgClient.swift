@@ -56,6 +56,9 @@ final class WnacgClient {
     /// 后台/息屏后本地代理可能已经失效；遇到 310 重启代理，
     /// 遇到 HTTP 429 时按 Retry-After / 指数退避重试。
     private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        // `load` is nonisolated async, so this first-time proxy startup runs
+        // on a cooperative thread instead of blocking the main actor.
+        ProxySession.shared.prepareIfNeeded()
         if ProxySession.shared.startupError != nil {
             // A single failed local-proxy start used to be sticky forever:
             // every later request threw before the retry loop, so only a

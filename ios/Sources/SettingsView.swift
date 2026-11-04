@@ -33,7 +33,9 @@ struct SettingsView: View {
                 Section {
                     Toggle("使用系统网络 / Loon 分流", isOn: $useSystemNetwork)
                         .onChange(of: useSystemNetwork) { _, enabled in
-                            ProxySession.shared.setUseSystemNetwork(enabled)
+                            Task.detached(priority: .userInitiated) {
+                                ProxySession.shared.setUseSystemNetwork(enabled)
+                            }
                         }
                 } header: {
                     Text("网络")

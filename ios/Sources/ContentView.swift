@@ -17,6 +17,9 @@ struct ContentView: View {
                         if let preview = model.preview {
                             previewCard(preview)
                         }
+                        if !model.queue.isEmpty {
+                            queueCard
+                        }
                         if let error = model.errorMessage {
                             errorCard(error)
                         }
@@ -321,6 +324,49 @@ struct ContentView: View {
             )
         }
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    private var queueCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label("下载队列", systemImage: "clock.arrow.circlepath")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(model.queue.count) 部")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(model.queue) { item in
+                HStack(spacing: 8) {
+                    Text(item.title)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light)
+                            .impactOccurred()
+                        model.cancelQueued(item.aid)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("取消排队：\(item.title)")
+                }
+                if item.aid != model.queue.last?.aid {
+                    Divider().opacity(0.35)
+                }
+            }
+
+            Text("当前任务完成后会按顺序自动开始")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(14)
+        .background(cardBackground)
     }
 
     private var statusBar: some View {
