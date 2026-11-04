@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var downloads: DownloadHistory
     @State private var showAlreadyDownloaded = false
+    @FocusState private var linkFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,14 @@ struct ContentView: View {
             .navigationTitle("下载")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        linkFieldFocused = false
+                    }
+                }
+            }
             .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
                 Button("取消", role: .cancel) {}
                 Button("重新下载", role: .destructive) {
@@ -74,6 +83,7 @@ struct ContentView: View {
             .autocorrectionDisabled()
             .keyboardType(.URL)
             .lineLimit(1...3)
+            .focused($linkFieldFocused)
             .padding(12)
             .background(Color.primary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -83,6 +93,10 @@ struct ContentView: View {
             )
 
             Button {
+                // Parsing is a point-of-no-return action: drop the keyboard
+                // first so the parsed preview and the tab bar are visible
+                // immediately instead of being covered by the keyboard.
+                linkFieldFocused = false
                 Task { await model.parse() }
             } label: {
                 HStack {

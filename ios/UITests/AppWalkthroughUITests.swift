@@ -46,6 +46,7 @@ final class AppWalkthroughUITests: XCTestCase {
             if parseButton.waitForExistence(timeout: 5) {
                 parseButton.tap()
                 sleep(14)
+                dismissKeyboard(app)
                 capture(app, "ui-walk-03-download-parsed")
                 dump(app, "WALK: DOWNLOAD parsed")
             }
@@ -58,7 +59,9 @@ final class AppWalkthroughUITests: XCTestCase {
         dump(app, "WALK: SETTINGS")
 
         // History sub-screen.
-        let historyLink = app.buttons["历史记录"].firstMatch
+        let historyLink = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS '历史记录'")
+        ).firstMatch
         if historyLink.waitForExistence(timeout: 6) {
             historyLink.tap()
             sleep(3)
@@ -73,15 +76,17 @@ final class AppWalkthroughUITests: XCTestCase {
         sleep(2)
         capture(app, "ui-walk-05-home-dark")
 
-        if app.buttons["同人志"].waitForExistence(timeout: 8) {
+        if app.buttons["同人志"].waitForExistence(timeout: 10) {
             app.buttons["同人志"].tap()
-            sleep(10)
+            _ = app.navigationBars["同人志"].waitForExistence(timeout: 30)
+            sleep(8)
             capture(app, "ui-walk-06-category-dark")
             dump(app, "WALK: CATEGORY (dark)")
 
             if let card = firstAlbumCard(app) {
                 card.tap()
-                sleep(6)
+                _ = app.navigationBars["详情"].waitForExistence(timeout: 30)
+                sleep(5)
                 capture(app, "ui-walk-07-detail-dark")
                 dump(app, "WALK: DETAIL (dark)")
                 goBack(app)
@@ -101,7 +106,11 @@ final class AppWalkthroughUITests: XCTestCase {
         if searchField.waitForExistence(timeout: 6) {
             searchField.tap()
             searchField.typeText("love\n")
-            sleep(12)
+            let searchNav = app.navigationBars.matching(
+                NSPredicate(format: "identifier CONTAINS '搜索'")
+            ).firstMatch
+            _ = searchNav.waitForExistence(timeout: 25)
+            sleep(8)
             capture(app, "ui-walk-08-search")
             dump(app, "WALK: SEARCH RESULTS")
             goBack(app)
@@ -117,6 +126,7 @@ final class AppWalkthroughUITests: XCTestCase {
         label: String,
         name: String
     ) {
+        dismissKeyboard(app)
         let tab = app.tabBars.buttons[label].firstMatch
         XCTAssertTrue(
             tab.waitForExistence(timeout: 10),
@@ -124,8 +134,25 @@ final class AppWalkthroughUITests: XCTestCase {
         )
         tab.tap()
         sleep(2)
+        XCTAssertTrue(
+            tab.isSelected,
+            "tab \(label) did not become selected (tap was swallowed)"
+        )
         capture(app, "ui-walk-tab-\(name)")
         dump(app, "WALK: TAB \(label)")
+    }
+
+    /// The keyboard covers the native tab bar on iOS 26; dismiss it before
+    /// tapping another tab (the app itself also drops focus when parsing).
+    private func dismissKeyboard(_ app: XCUIApplication) {
+        guard app.keyboards.firstMatch.exists else { return }
+        let done = app.buttons["完成"].firstMatch
+        if done.exists {
+            done.tap()
+        } else {
+            app.scrollViews.firstMatch.swipeDown()
+        }
+        sleep(1)
     }
 
     private func setAppearance(
