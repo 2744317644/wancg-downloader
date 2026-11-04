@@ -28,3 +28,8 @@ push_gh.py
 push_prefetch.py
 
 push_favorites.py
+
+# local debug artifacts
+job.log
+tree.json
+docs/screenshots/
