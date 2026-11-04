@@ -178,7 +178,7 @@ struct CategoryView: View {
     /// an iPhone: the next site page is normally in place before the user can
     /// see the final row, so that row is already filled with new covers
     /// instead of showing a single orphaned card above the footer.
-    private static let prefetchDistance = 6
+    private static let prefetchDistance = 9
 
     private var columns: [GridItem] {
         let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 160 : 104

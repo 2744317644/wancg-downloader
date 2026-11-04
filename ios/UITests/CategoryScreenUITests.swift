@@ -129,66 +129,63 @@ final class CategoryScreenUITests: XCTestCase {
             sleep(2)
         }
 
+        // Count is exposed by the footer's accessibility label even when the
+        // footer is off-screen (the outer VStack is non-lazy), so the test can
+        // observe automatic loading without chasing an ever-moving footer.
         var counts: [Int] = []
-        var hitEnd = false
+        if let baseline = loadedAlbumCount(app) {
+            counts.append(baseline)
+            print("AUTO_BASELINE_COUNT \(baseline)")
+        }
         var loadFailed = false
         for round in 0..<3 {
-            let reachedFooter = scrollToFooter(app)
-            XCTAssertTrue(reachedFooter, "footer not reachable in load-more round \(round)")
-            if !reachedFooter { break }
-            if let count = loadedAlbumCount(app) {
-                counts.append(count)
-                print("AUTO_LOAD_ROUND \(round) BEFORE COUNT \(count)")
-            }
-            if endReached(app) {
-                hitEnd = true
+            if loadMoreErrorText(app) != nil {
+                XCTFail("load-more error before round \(round)")
+                loadFailed = true
                 break
             }
-            // IMPORTANT: never tap the footer button here. Scrolling to the
-            // last row itself must trigger the next page automatically; that
-            // is exactly the regression the user reported.
+            // Swipe down like a normal user. No footer button is tapped.
+            for _ in 0..<4 {
+                app.swipeUp()
+                usleep(600_000)
+            }
             var grew = false
             for attempt in 0..<10 {
-                waitForFooterToSettle(app)
                 if let errorText = loadMoreErrorText(app) {
-                    print("LOAD_MORE_ERROR_ROUND \(round): \(errorText)")
-                    capture(name: "ui-08-load-error-round-\(round)")
+                    print("AUTO_LOAD_ERROR_ROUND \(round): \(errorText)")
+                    capture(name: "ui-08-auto-load-error-round-\(round)")
                     XCTFail("load-more failed in round \(round): \(errorText)")
                     loadFailed = true
                     break
                 }
-                _ = scrollToFooter(app)
                 if let count = loadedAlbumCount(app),
                    let last = counts.last, count > last {
                     counts.append(count)
-                    print("AUTO_LOAD_ROUND \(round) AFTER COUNT \(count) (attempt \(attempt))")
+                    print("AUTO_LOAD_ROUND \(round) COUNT \(count) (attempt \(attempt))")
                     grew = true
                     break
                 }
-                if endReached(app) {
-                    hitEnd = true
-                    break
-                }
-                // Nudge the list so the last-row cells enter the lazy grid's
-                // render window; this is the user's normal swipe-down gesture.
+                if endReached(app) { break }
                 app.swipeUp()
-                sleep(1)
+                usleep(700_000)
             }
-            if loadFailed || hitEnd { break }
+            if loadFailed { break }
+            if !grew, endReached(app) { break }
             XCTAssertTrue(
                 grew,
-                "scrolling to the last row did NOT auto-load the next page "
-                    + "in round \(round) (only the footer button works)"
+                "scrolling to the end did NOT auto-load the next page in "
+                    + "round \(round) (only the footer button works)"
             )
             if !grew { break }
             capture(name: "ui-08-auto-load-round-\(round)")
         }
-        print("AUTO_LOAD_COUNTS: \(counts) hitEnd=\(hitEnd)")
-        if !hitEnd, !loadFailed, counts.count >= 2,
+        print("AUTO_LOAD_COUNTS: \(counts)")
+        if !loadFailed, counts.count >= 2,
            let first = counts.first, let last = counts.last {
             XCTAssertGreaterThan(
                 last, first,
-                "album count should grow across automatic load-more rounds"
+                "album count should grow while scrolling without tapping "
+                    + "the footer button"
             )
         }
 
