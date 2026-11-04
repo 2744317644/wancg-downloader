@@ -148,26 +148,27 @@ struct AlbumDetailView: View {
         }
     }
 
-    /// A blurred, faded cover backdrop gives the detail page a hero feel
-    /// without changing the header layout: it is drawn as a background so the
-    /// ZStack never grows past the normal header height.
+    /// A soft cover-coloured halo behind the thumbnail. The previous version
+    /// blurred the cover across the whole header, which muddied the title and
+    /// metadata; limiting the glow to the cover area keeps the page clean.
     private var headerWithBackdrop: some View {
         header.background(alignment: .topLeading) {
             if let backdropImage {
                 Image(uiImage: backdropImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(height: 280)
-                    .frame(maxWidth: .infinity)
-                    .blur(radius: 28, opaque: true)
-                    .opacity(0.30)
+                    .frame(width: 190, height: 220)
+                    .blur(radius: 36, opaque: true)
+                    .opacity(0.40)
                     .mask(
-                        LinearGradient(
-                            colors: [.black, .black.opacity(0.35), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
+                        RadialGradient(
+                            colors: [.black, .black.opacity(0.6), .clear],
+                            center: .center,
+                            startRadius: 16,
+                            endRadius: 112
                         )
                     )
+                    .offset(x: -16, y: -14)
                     .allowsHitTesting(false)
             }
         }

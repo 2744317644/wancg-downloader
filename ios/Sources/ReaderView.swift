@@ -286,6 +286,19 @@ struct ReaderView: View {
                 }
             }
         )
+        .simultaneousGesture(
+            // Edge-swipe back: a horizontal drag that starts at the very left
+            // edge dismisses the full-screen reader, matching the system
+            // interactive-pop gesture users expect.
+            DragGesture(minimumDistance: 14, coordinateSpace: .global)
+                .onEnded { value in
+                    guard value.startLocation.x < 32,
+                          value.translation.width > 90,
+                          abs(value.translation.height)
+                            < abs(value.translation.width) else { return }
+                    dismiss()
+                }
+        )
         .overlay(alignment: .trailing) {
             ReaderPageSlider(controller: scrollController)
                 .padding(.trailing, 2)
