@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-11-04（第三轮：技能库多代理审计 + 稳定性/性能修复）
+
+### 使用 E:\Code\Skills 派出 4 个并行子 agent
+
+用技能库里的四个技能做只读审计（报告在 `docs/qa/`）：
+
+- `review-swarm` → `docs/qa/review-swarm-v1.22.0.md`（v1.21.4..v1.22.0 diff 的回归/安全/可靠性/契约审查）
+- `swiftui-performance-audit` → `docs/qa/swiftui-performance-audit-v1.22.0.md`
+- `swiftui-ui-patterns` + `swiftui-liquid-glass` → `docs/qa/ui-patterns-review-v1.22.0.md`
+- `swift-concurrency-expert` → `docs/qa/concurrency-review-v1.22.0.md`
+
+### 按报告修复
+
+- 分类页自动重试任务会取消自己（`load()` 取消 `recoveryTask`），重试以 -999 失败 → 修正。
+- 代理重启 `invalidateAndCancel()` 共享 session 导致兄弟请求 -999 失败 → 将 -999 纳入重试。
+- 本地代理启动失败一次后 `startupError` 粘滞 → 请求前尝试重启一次。
+- 阅读器补 `.preferredColorScheme(.dark)` + 深色工具栏（修 iOS 17/18 浅色下标题不可见）。
+- `seamlessNavigationBar()` 只在 iOS 26 隐藏背景，旧系统保留系统导航栏背景。
+- 性能：正则缓存、页面解析移出主线程、磁盘封面 ImageIO 预解码、收藏文件匹配改集合、文件列表 stat 只读一次、默认关闭空 120Hz display link。
+- 44pt 触摸目标：粘贴/复制/收藏/首页 chips/更多。
+- CI：`ui-preview.yml` 现在在 main 的 `ios/**` 变更时自动跑；全流程测试增加“解析后键盘自动收起”断言。
+
+### 发布
+
+- **v1.22.1（build 260）**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.22.1>
+- 验证：iOS 26.2 模拟器全流程 + 分类页回归通过；Release 编译/smoke test 通过。
+
+---
+
 ## 2026-11-04（第二轮：全流程 QA + UI 美化）
 
 ### 全流程模拟器走查
