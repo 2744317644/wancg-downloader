@@ -256,101 +256,86 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(model.pageURLs.enumerated()), id: \.offset) { index, url in
-                    ReaderPageView(
-                        url: url,
-                        referer: referer,
-                        pageNumber: index + 1,
-                        prefetchURLs: Array(
-                            model.pageURLs.dropFirst(index + 1).prefix(10)
-                        ),
-                        onReload: {
-                            Task { await model.reload() }
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(
+                            Array(model.pageURLs.enumerated()),
+                            id: \.offset
+                        ) { index, url in
+                            ReaderPageView(
+                                url: url,
+                                referer: referer,
+                                pageNumber: index + 1,
+                                prefetchURLs: Array(
+                                    model.pageURLs.dropFirst(index + 1).prefix(10)
+                                ),
+                                onReload: {
+                                    Task { await model.reload() }
+                                }
+                            )
                         }
+                    }
+                    .background(
+                        ReaderScrollObserver(controller: scrollController)
+                            .frame(width: 0, height: 0)
                     )
                 }
-            }
-            .background(
-                ReaderScrollObserver(controller: scrollController)
-                    .frame(width: 0, height: 0)
-            )
-        }
-        .scrollIndicators(.hidden)
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    chromeHidden.toggle()
-                }
-            }
-        )
-        .simultaneousGesture(
-            // Edge-swipe back: a horizontal drag that starts at the very left
-            // edge dismisses the full-screen reader, matching the system
-            // interactive-pop gesture users expect.
-            DragGesture(minimumDistance: 14, coordinateSpace: .global)
-                .onEnded { value in
-                    guard value.startLocation.x < 32,
-                          value.translation.width > 90,
-                          abs(value.translation.height)
-                            < abs(value.translation.width) else { return }
-                    dismiss()
-                }
-        )
-        .overlay(alignment: .trailing) {
-            ReaderPageSlider(controller: scrollController)
-                .padding(.trailing, 2)
-                .opacity(model.pageURLs.isEmpty ? 0 : 1)
-        }
-        .overlay(alignment: .bottom) {
-            if !model.pageURLs.isEmpty {
-                ReaderProgressHUD(
-                    controller: scrollController,
-                    pageCount: model.pageURLs.count
+                .scrollIndicators(.hidden)
+                // Full-bleed content: chrome is an overlay, so showing or
+                // hiding it never changes the scroll view's safe-area inset
+                // (which used to make the manga jump up when toggling).
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            chromeHidden.toggle()
+                        }
+                    }
                 )
-                .padding(.bottom, 18)
-            }
-        }
-        .background(Color.black.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .seamlessNavigationBar()
-        // Reader chrome is always dark; without declaring it, the inline
-        // title and page-count text were invisible in iOS 17/18 light mode
-        // (iOS 26's glass toolbar masked the bug).
-        .preferredColorScheme(.dark)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar(chromeHidden ? .hidden : .visible, for: .navigationBar)
-        .statusBarHidden(chromeHidden)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
+                .simultaneousGesture(
+                    // Edge-swipe back: a horizontal drag that starts at the
+                    // very left edge dismisses the full-screen reader,
+                    // matching the system interactive-pop gesture.
+                    DragGesture(minimumDistance: 14, coordinateSpace: .global)
+                        .onEnded { value in
+                            guard value.startLocation.x < 32,
+                                  value.translation.width > 90,
+                                  abs(value.translation.height)
+                                    < abs(value.translation.width) else {
+                                return
+                            }
+                            dismiss()
+                        }
+                )
+                .overlay(alignment: .trailing) {
+                    ReaderPageSlider(controller: scrollController)
+                        .padding(.trailing, 2)
+                        .opacity(model.pageURLs.isEmpty ? 0 : 1)
                 }
-                .accessibilityIdentifier("reader-close-button")
-                .accessibilityLabel("关闭阅读")
-            }
+                .overlay(alignment: .bottom) {
+                    if !model.pageURLs.isEmpty {
+                        ReaderProgressHUD(
+                            controller: scrollController,
+                            pageCount: model.pageURLs.count
+                        )
+                        .padding(.bottom, 24)
+                    }
+                }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                if !model.pageURLs.isEmpty {
-                    Text("\(model.pageURLs.count)P")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                readerChrome(topInset: geometry.safeAreaInsets.top)
+                    .opacity(chromeHidden ? 0 : 1)
+                    .allowsHitTesting(!chromeHidden)
+                    .animation(.easeInOut(duration: 0.2), value: chromeHidden)
             }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await model.reload() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(model.isLoading)
-            }
+            .background(Color.black.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            // Always hide the status bar: keeping its state constant removes
+            // the other half of the toggle-induced layout shift.
+            .statusBarHidden(true)
+            .preferredColorScheme(.dark)
         }
         .overlay {
             if model.isLoading {
@@ -381,6 +366,62 @@ struct ReaderView: View {
         .onDisappear {
             ReaderImageStore.shared.cancelPrefetch()
         }
+    }
+
+    /// Custom chrome floating over the artwork. It lives in a ZStack sibling
+    /// layer, so its visibility has zero effect on the scroll layout.
+    private func readerChrome(topInset: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                dismiss()
+            } label: {
+                chromeCircle("xmark")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("reader-close-button")
+            .accessibilityLabel("关闭阅读")
+
+            Spacer(minLength: 0)
+
+            if !model.pageURLs.isEmpty {
+                Text("\(model.pageURLs.count)P")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(
+                        Capsule().stroke(
+                            Color.white.opacity(0.16), lineWidth: 0.5
+                        )
+                    )
+            }
+
+            Button {
+                Task { await model.reload() }
+            } label: {
+                chromeCircle("arrow.clockwise")
+                    .opacity(model.isLoading ? 0.45 : 1)
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isLoading)
+            .accessibilityLabel("重新加载")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14)
+        .padding(.top, max(topInset, 12) + 6)
+    }
+
+    private func chromeCircle(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(
+                Circle().stroke(Color.white.opacity(0.16), lineWidth: 0.5)
+            )
     }
 }
 
