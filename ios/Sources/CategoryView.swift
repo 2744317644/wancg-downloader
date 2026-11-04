@@ -23,11 +23,13 @@ final class CategoryFeedModel: ObservableObject {
     private var filterLanguage: MangaLanguageFilter = .all
     private var filterHideAI = false
     private var lastLoadFinishedAt: Date?
+    private var recoveryTask: Task<Void, Never>?
+    private var recoveryAttempts = 0
 
     /// Pages are fetched one at a time; a minimum gap keeps rapid scroll
     /// events from firing a burst of requests at the site (which answers with
     /// HTTP 429 and made "load more" look permanently broken).
-    private let minimumRequestInterval: TimeInterval = 1.1
+    private let minimumRequestInterval: TimeInterval = 0.7
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -80,6 +82,11 @@ final class CategoryFeedModel: ObservableObject {
 
     private func load(reset: Bool, force: Bool = false) async {
         if isLoading && !force { return }
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        if reset {
+            recoveryAttempts = 0
+        }
         generation += 1
         let token = generation
         isLoading = true
@@ -135,6 +142,7 @@ final class CategoryFeedModel: ObservableObject {
             }
 
             didLoadOnce = true
+            recoveryAttempts = 0
             recomputeVisibleAlbums()
         } catch let err {
             guard token == generation else { return }
@@ -142,12 +150,31 @@ final class CategoryFeedModel: ObservableObject {
             // an early return here would leave the feed permanently "busy".
             if !(err is CancellationError) {
                 error = err.localizedDescription
+                scheduleRecovery()
             }
         }
 
         lastLoadFinishedAt = Date()
         if token == generation {
             isLoading = false
+        }
+    }
+
+    /// A transient network/429 failure used to stop the feed until the user
+    /// manually refreshed. Retry up to twice with a short delay so a single
+    /// hiccup heals itself while the user keeps browsing.
+    private func scheduleRecovery() {
+        recoveryTask?.cancel()
+        guard recoveryAttempts < 2 else { return }
+        recoveryAttempts += 1
+        recoveryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard let self, !Task.isCancelled else { return }
+            guard self.error != nil, self.hasMore, !self.isLoading else {
+                return
+            }
+            self.error = nil
+            await self.load(reset: false)
         }
     }
 }
@@ -178,7 +205,7 @@ struct CategoryView: View {
     /// an iPhone: the next site page is normally in place before the user can
     /// see the final row, so that row is already filled with new covers
     /// instead of showing a single orphaned card above the footer.
-    private static let prefetchDistance = 9
+    private static let prefetchDistance = 12
 
     private var columns: [GridItem] {
         let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 160 : 104
@@ -304,6 +331,19 @@ struct CategoryView: View {
                         requestMore()
                     }
                 }
+            }
+
+            if model.hasMore {
+                // Lazy sentinel: lives *inside* the LazyVGrid (so it is only
+                // created near the viewport), and gets a new identity after
+                // every fetched page. That re-arms the automatic load without
+                // the old problem of a non-lazy sentinel firing once at launch
+                // or an immediately-retriggered `.id` chain.
+                Color.clear
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+                    .id("lazy-end-\(model.loadedPageCount)-\(model.albums.count)")
+                    .onAppear { requestMore() }
             }
         }
         .padding(.top, 4)
