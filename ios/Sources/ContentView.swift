@@ -354,7 +354,7 @@ struct ContentView: View {
                 .buttonStyle(.plain)
             }
 
-            ForEach(recentFiles.indices, id: \.self) { index in
+            ForEach(0..<recentFiles.count, id: \.self) { index in
                 let item = recentFiles[index]
                 HStack(spacing: 10) {
                     Image(systemName: item.isPDF
