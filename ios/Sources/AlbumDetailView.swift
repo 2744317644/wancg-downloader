@@ -42,6 +42,7 @@ struct AlbumDetailView: View {
     @State private var showAlreadyDownloaded = false
     @State private var didCopyTitle = false
     @State private var downloadStartedHere = false
+    @State private var showReader = false
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("content.hideAI") private var hideAI = false
     @StateObject private var model: AlbumDetailModel
@@ -126,6 +127,16 @@ struct AlbumDetailView: View {
             }
         } message: {
             Text("《\(displayTitle)》已经下载过。重新下载会覆盖同名文件。")
+        }
+        // Present the reader as a full-screen cover instead of a navigation
+        // push. The push had to hide the native tab bar (`.toolbar(.hidden,
+        // for: .tabBar)`), and dismissing it animated the floating tab bar
+        // back in a beat later. With a cover the tab bar is never hidden or
+        // re-shown, so it is simply already there when the reader closes.
+        .fullScreenCover(isPresented: $showReader) {
+            NavigationStack {
+                ReaderView(aid: album.aid, title: displayTitle)
+            }
         }
     }
 
@@ -215,8 +226,8 @@ struct AlbumDetailView: View {
 
     private var actionButtons: some View {
         VStack(spacing: 10) {
-            NavigationLink {
-                ReaderView(aid: album.aid, title: displayTitle)
+            Button {
+                showReader = true
             } label: {
                 Label("开始阅读", systemImage: "book.fill")
                     .font(.subheadline.bold())

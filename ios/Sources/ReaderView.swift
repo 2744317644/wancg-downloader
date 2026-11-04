@@ -234,6 +234,7 @@ struct ReaderView: View {
     let aid: String
     let title: String
 
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var model: ReaderModel
     @State private var scrollController = ReaderScrollController()
 
@@ -279,8 +280,17 @@ struct ReaderView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityIdentifier("reader-close-button")
+                .accessibilityLabel("关闭阅读")
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 if !model.pageURLs.isEmpty {
                     Text("\(model.pageURLs.count)P")

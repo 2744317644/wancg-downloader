@@ -109,12 +109,32 @@ final class CategoryScreenUITests: XCTestCase {
             capture(name: "ui-06-category-ai-filter")
         }
 
-        // Third level: a cover must still push the detail screen.
+        // Third level: a cover must still push the detail screen, and the
+        // reader must come back with the tab bar already in place (regression:
+        // pushing the reader hid the tab bar and it animated back late).
         if let firstCard = firstAlbumCard(app) {
             firstCard.tap()
             if app.navigationBars["详情"].waitForExistence(timeout: 30) {
                 sleep(5)
                 capture(name: "ui-07-detail")
+                let startReading = app.buttons["开始阅读"].firstMatch
+                if startReading.waitForExistence(timeout: 10) {
+                    startReading.tap()
+                    let closeReader = app.buttons["reader-close-button"].firstMatch
+                    if closeReader.waitForExistence(timeout: 60) {
+                        sleep(6)
+                        capture(name: "ui-10-reader")
+                        closeReader.tap()
+                        sleep(2)
+                        XCTAssertTrue(
+                            app.tabBars.firstMatch.exists,
+                            "tab bar must be present right after closing the reader"
+                        )
+                        capture(name: "ui-11-after-reader")
+                    } else {
+                        XCTFail("reader screen did not present")
+                    }
+                }
                 app.navigationBars.buttons.firstMatch.tap()
                 sleep(2)
             }
