@@ -504,6 +504,7 @@ private struct RecentDownload: Identifiable {
     let date: Date
 
     var id: URL { url }
+    var name: String { url.lastPathComponent }
     var isPDF: Bool { url.pathExtension.lowercased() == "pdf" }
     var sizeLabel: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
