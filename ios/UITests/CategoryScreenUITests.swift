@@ -282,15 +282,23 @@ final class CategoryScreenUITests: XCTestCase {
     }
 
     private func loadedAlbumCount(_ app: XCUIApplication) -> Int? {
-        let matches = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "label MATCHES '.*(已加载|共) [0-9]+ 部.*'"
-            )
-        ).allElementsBoundByIndex
-        for element in matches {
-            if let value = parseLoadedCount(element.label) {
-                return value
-            }
+        // Read targeted firstMatch queries only; enumerating the whole tree
+        // while a page is being appended invalidates snapshots mid-iteration.
+        let button = app.buttons["load-more-button"].firstMatch
+        if button.exists, let value = parseLoadedCount(button.label) {
+            return value
+        }
+        let endText = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH '已经到底了'")
+        ).firstMatch
+        if endText.exists, let value = parseLoadedCount(endText.label) {
+            return value
+        }
+        let loadingText = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '已加载'")
+        ).firstMatch
+        if loadingText.exists, let value = parseLoadedCount(loadingText.label) {
+            return value
         }
         return nil
     }
