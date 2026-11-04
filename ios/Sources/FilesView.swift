@@ -69,6 +69,7 @@ struct FilesView: View {
                     .listStyle(.insetGrouped)
                 }
             }
+            .background(AppBackground())
             .navigationTitle("文件")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()

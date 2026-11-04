@@ -94,6 +94,7 @@ struct HistoryView: View {
                     .listStyle(.insetGrouped)
                 }
             }
+            .background(AppBackground())
             .navigationTitle("历史")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()

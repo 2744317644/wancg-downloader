@@ -43,7 +43,6 @@ struct AlbumDetailView: View {
     @State private var didCopyTitle = false
     @State private var downloadStartedHere = false
     @State private var showReader = false
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("content.hideAI") private var hideAI = false
     @StateObject private var model: AlbumDetailModel
 
@@ -167,6 +166,8 @@ struct AlbumDetailView: View {
                             ? "checkmark.circle.fill" : "doc.on.doc")
                             .font(.caption)
                             .foregroundStyle(didCopyTitle ? Color.mint : Color.secondary)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("复制标题")
@@ -205,6 +206,23 @@ struct AlbumDetailView: View {
         }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(
+                    LinearGradient(
+                        colors: [.mint, .blue],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3, height: 14)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+    }
+
     private func infoLine(_ icon: String, _ text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
@@ -231,16 +249,12 @@ struct AlbumDetailView: View {
             } label: {
                 Label("开始阅读", systemImage: "book.fill")
                     .font(.subheadline.bold())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(
+                    .background(.mint, in: RoundedRectangle(
                         cornerRadius: 13, style: .continuous
                     ))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
             }
             .buttonStyle(.plain)
 
@@ -248,7 +262,7 @@ struct AlbumDetailView: View {
                 HStack(spacing: 8) {
                     if isActiveDownload {
                         ProgressView()
-                            .tint(.black)
+                            .tint(.primary)
                     } else {
                         Image(systemName: isQueued
                             ? "clock" : "arrow.down.circle.fill")
@@ -256,15 +270,20 @@ struct AlbumDetailView: View {
                     Text(downloadButtonTitle)
                         .font(.subheadline.bold())
                 }
-                .foregroundStyle(.black)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(.mint, in: RoundedRectangle(
+                .background(.ultraThinMaterial, in: RoundedRectangle(
                     cornerRadius: 13, style: .continuous
                 ))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
             .disabled(isActiveDownload || isQueued)
+            .opacity(isActiveDownload || isQueued ? 0.65 : 1)
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -301,9 +320,7 @@ struct AlbumDetailView: View {
 
     private var tagGrid: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("标签")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            sectionHeader("标签")
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 68), spacing: 8)],
                 alignment: .leading,
@@ -418,8 +435,7 @@ struct AlbumDetailView: View {
             .filter { $0.aid != album.aid && (!hideAI || !$0.isAI) }
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("看过这本的人也看了")
-                    .font(.headline)
+                sectionHeader("看过这本的人也看了")
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 12) {
@@ -437,7 +453,7 @@ struct AlbumDetailView: View {
                                         .frame(width: 112, alignment: .leading)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(AlbumCardButtonStyle())
                         }
                     }
                     .padding(.vertical, 2)
@@ -464,19 +480,6 @@ struct AlbumDetailView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: colorScheme == .dark
-                ? [
-                    Color(red: 0.04, green: 0.06, blue: 0.10),
-                    Color(red: 0.02, green: 0.03, blue: 0.06),
-                ]
-                : [
-                    Color(uiColor: .systemBackground),
-                    Color(uiColor: .secondarySystemBackground),
-                ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        AppBackground()
     }
 }

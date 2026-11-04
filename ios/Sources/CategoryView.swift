@@ -352,7 +352,7 @@ struct CategoryView: View {
     private var skeletonGrid: some View {
         LazyVGrid(columns: columns, spacing: 14) {
             ForEach(0..<12, id: \.self) { _ in
-                SkeletonAlbumCard()
+                AlbumSkeletonCard()
             }
         }
         .padding(.top, 4)
@@ -677,39 +677,8 @@ struct CategoryView: View {
     }
 
     private var background: some View {
-        Color(uiColor: .systemGroupedBackground)
-            .ignoresSafeArea()
+        AppBackground()
     }
 }
 
-// MARK: - Supporting views
 
-private struct SkeletonAlbumCard: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var dimmed = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.primary.opacity(0.07))
-                .aspectRatio(3.0 / 4.0, contentMode: .fit)
-
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-                .frame(height: 9)
-
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-                .frame(width: 62, height: 8)
-        }
-        .opacity(dimmed ? 0.55 : 1)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(
-                .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
-            ) {
-                dimmed = true
-            }
-        }
-    }
-}

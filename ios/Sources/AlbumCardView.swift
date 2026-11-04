@@ -36,6 +36,37 @@ extension AlbumCardView: Equatable {
     }
 }
 
+/// 首页 / 分类页共用的骨架占位卡。
+struct AlbumSkeletonCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dimmed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.07))
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+                .frame(height: 9)
+
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+                .frame(width: 62, height: 8)
+        }
+        .opacity(dimmed ? 0.55 : 1)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(
+                .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+            ) {
+                dimmed = true
+            }
+        }
+    }
+}
+
 struct HomeCover: View {
     let album: HomeAlbum
     @State private var image: UIImage?

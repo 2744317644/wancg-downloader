@@ -79,7 +79,7 @@ struct FavoritesView: View {
                 }
             }
             .background(
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+                AppBackground()
             )
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
@@ -173,7 +173,7 @@ struct FavoritesView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AlbumCardButtonStyle())
         .contextMenu {
             Button(role: .destructive) {
                 favorites.remove(item)

@@ -3,7 +3,6 @@ import UIKit
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var downloads: DownloadHistory
     @State private var showAlreadyDownloaded = false
     @FocusState private var linkFieldFocused: Bool
@@ -52,27 +51,33 @@ struct ContentView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: colorScheme == .dark
-                ? [
-                    Color(red: 0.04, green: 0.06, blue: 0.10),
-                    Color(red: 0.02, green: 0.03, blue: 0.06),
-                ]
-                : [
-                    Color(uiColor: .systemBackground),
-                    Color(uiColor: .secondarySystemBackground),
-                ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        AppBackground()
     }
 
     private var inputCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("作品链接")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary.opacity(0.9))
+            HStack(spacing: 8) {
+                Text("作品链接")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.primary.opacity(0.9))
+                Spacer(minLength: 0)
+                Button {
+                    if let text = UIPasteboard.general.string?
+                        .trimmingCharacters(in: .whitespacesAndNewlines),
+                       !text.isEmpty {
+                        model.input = text
+                    }
+                    linkFieldFocused = true
+                } label: {
+                    Label("粘贴", systemImage: "doc.on.clipboard")
+                        .font(.caption.weight(.medium))
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.mint)
+                .accessibilityLabel("从剪贴板粘贴链接")
+            }
 
             TextField(
                 "https://www.wnacg.com/photos-index-aid-383877.html",

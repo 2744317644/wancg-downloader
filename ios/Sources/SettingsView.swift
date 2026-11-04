@@ -1,6 +1,15 @@
 import SwiftUI
 
 struct SettingsView: View {
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "1.0"
+    }
+
+    private var appBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+    }
+
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage("network.useSystemNetwork") private var useSystemNetwork = false
     @AppStorage("display.force120") private var force120 = true
@@ -101,17 +110,26 @@ struct SettingsView: View {
                     Text("在右上角显示实时 FPS 和最近最慢一帧耗时，用于反馈滑动卡顿。")
                 }
 
-                Section("关于") {
+                Section {
                     HStack {
                         Text("版本")
                         Spacer()
-                        Text(
-                            Bundle.main.infoDictionary?[
-                                "CFBundleShortVersionString"
-                            ] as? String ?? "1.0"
-                        )
-                        .foregroundStyle(.secondary)
+                        Text(appVersion)
+                            .foregroundStyle(.secondary)
                     }
+                    HStack {
+                        Text("构建")
+                        Spacer()
+                        Text(appBuild)
+                            .foregroundStyle(.secondary)
+                    }
+                    Link(destination: URL(
+                        string: "https://github.com/2744317644/wancg-downloader/releases"
+                    )!) {
+                        Label("查看最新版本", systemImage: "arrow.up.circle")
+                    }
+                } header: {
+                    Text("关于")
                 }
             }
             .navigationTitle("设置")

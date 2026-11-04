@@ -251,7 +251,6 @@ struct HomeView: View {
     @State private var searchText = ""
     @State private var searchQuery = ""
     @State private var showSearch = false
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("content.hideAI") private var hideAI = false
 
     private let columns = Array(
@@ -413,7 +412,10 @@ struct HomeView: View {
                 Text(section.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Spacer()
+                Spacer(minLength: 8)
+                Text("\(section.albums.count) 部")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 if let moreURL = section.moreURL {
                     NavigationLink {
                         CategoryView(
@@ -426,8 +428,11 @@ struct HomeView: View {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 9, weight: .semibold))
                         }
-                        .font(.caption2)
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.mint)
+                        .padding(.leading, 6)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -455,14 +460,23 @@ struct HomeView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-            Text("正在加载首页…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("正在加载首页…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            // 骨架屏比居中菊花更稳：首屏布局不跳，图片回来时自然填充。
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(0..<9, id: \.self) { _ in
+                    AlbumSkeletonCard()
+                }
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, 4)
+        .allowsHitTesting(false)
     }
 
     private func errorView(_ message: String) -> some View {
@@ -494,19 +508,6 @@ struct HomeView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: colorScheme == .dark
-                ? [
-                    Color(red: 0.04, green: 0.06, blue: 0.10),
-                    Color(red: 0.02, green: 0.03, blue: 0.06),
-                ]
-                : [
-                    Color(uiColor: .systemBackground),
-                    Color(uiColor: .secondarySystemBackground),
-                ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        AppBackground()
     }
 }
