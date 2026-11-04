@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-11-04（第四轮：主线程零阻塞 + 体验增强 + 双 iOS CI）
+
+### 稳定性
+
+- `ProxySession` 改为懒启动：代理 listener 启动（最长 5s）不再发生在 App 启动/回前台/阅读器重载/设置切换的主线程上；启动与回前台重启都移到后台线程，并用 NSCondition 让并发请求等待首次启动完成。
+- `WnacgApp` 去掉启动时直接 `LocalProxy.start()` 的阻塞调用，改为后台预热。
+
+### 下载体验
+
+- 下载进度、Live Activity、PDF 进度更新全部节流（进度 UI ≤10 次/秒、Live Activity ≤2 次/秒、PDF ≤6.7 次/秒）。
+- 下载页新增「下载队列」卡片：显示排队作品、数量，可逐个取消排队（`AppModel.cancelQueued`）。
+
+### 阅读 / 详情
+
+- 阅读器新增滚动进度 HUD（「37% · 共 126P」，滚动出现 1.5s 后淡出；进度来自真实滚动偏移）。
+- 详情页标签默认折叠为 8 个，可展开全部；标签点击目标 44pt。
+
+### CI
+
+- `ui-preview.yml` 新增 `legacy-runtime` 并行 job：自动选择最旧可用 iOS runtime（当前 18.x）跑分类页回归，覆盖 iOS 17/18 兼容性；主 job 继续在最新 iOS 26.2 跑完整全流程测试。
+- 两个 job 均通过；Release 编译与 smoke test 通过。
+
+### 发布
+
+- **v1.23.0（build 261）**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.23.0>
+
+---
+
 ## 2026-11-04（第三轮：技能库多代理审计 + 稳定性/性能修复）
 
 ### 使用 E:\Code\Skills 派出 4 个并行子 agent
