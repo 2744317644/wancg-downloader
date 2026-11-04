@@ -25,6 +25,11 @@ final class WnacgClient {
             throw WnacgError.message("无效的服务器响应")
         }
         guard http.statusCode == 200 else {
+            if http.statusCode == 429 {
+                throw WnacgError.message(
+                    "访问太频繁，被站点限流（HTTP 429），稍后点“重试”即可"
+                )
+            }
             throw WnacgError.message("访问失败：HTTP \(http.statusCode)")
         }
         return String(decoding: data, as: UTF8.self)

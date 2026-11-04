@@ -1,10 +1,9 @@
 import XCTest
 
-/// Lightweight visual/functional harness for the second-level listing screen.
-/// It runs on a GitHub Actions macOS simulator (there is no local Xcode on the
-/// Windows dev box), taps into the 同人志 category from Home, scrolls the grid,
-/// exercises the filter chips and leaves PNG screenshots in the runner's temp
-/// directory so the workflow can collect them.
+/// Visual/functional + load-more stress harness for the second-level listing
+/// screen. Runs on a GitHub Actions macOS simulator (there is no local Xcode
+/// on the Windows dev box), leaves PNG screenshots in the runner's temp
+/// directory and prints the accessibility tree for layout checks.
 final class CategoryScreenUITests: XCTestCase {
 
     override func setUpWithError() throws {
@@ -47,8 +46,6 @@ final class CategoryScreenUITests: XCTestCase {
         capture(name: "ui-02-category-top")
         dumpTree(app, label: "CATEGORY TREE (top)")
 
-        // Only the native TabView bar may exist at the bottom. The old design
-        // stacked a floating pager bar on top of it.
         XCTAssertEqual(app.tabBars.count, 1, "expected exactly one native tab bar")
         XCTAssertEqual(
             app.staticTexts.matching(
@@ -58,14 +55,13 @@ final class CategoryScreenUITests: XCTestCase {
             "old pager counter must be gone"
         )
 
-        // Scroll far enough to trigger the bottom sentinel / cover reuse.
+        // Scroll far enough to trigger the first load-more.
         app.swipeUp()
         sleep(3)
         app.swipeUp()
         sleep(4)
         capture(name: "ui-03-category-scrolled")
-        let cardsAfterScroll = albumCardCount(app)
-        print("ALBUM_CARDS_AFTER_SCROLL: \(cardsAfterScroll)")
+        print("ALBUM_CARDS_AFTER_SCROLL: \(albumCardCount(app))")
 
         // Back to the top: the inline scope chips scroll away with the content.
         scrollToTop(app)
@@ -101,12 +97,14 @@ final class CategoryScreenUITests: XCTestCase {
 
         // AI filter toggle chip must be reachable on the same row.
         let aiChip = app.buttons["屏蔽 AI"].firstMatch
+        var aiFilterOn = false
         if aiChip.waitForExistence(timeout: 5) {
             XCTAssertGreaterThanOrEqual(
                 aiChip.frame.height, 43.5,
                 "AI filter chip touch target must be at least 44pt"
             )
             aiChip.tap()
+            aiFilterOn = true
             sleep(3)
             capture(name: "ui-06-category-ai-filter")
         }
@@ -122,10 +120,141 @@ final class CategoryScreenUITests: XCTestCase {
             }
         }
 
+        // ---- load-more stress: this is the regression the user reported ----
+        scrollToTop(app)
+        sleep(1)
+        // Reset the AI filter toggled above so it does not reduce the sample.
+        if aiFilterOn, app.buttons["屏蔽 AI"].firstMatch.exists {
+            app.buttons["屏蔽 AI"].firstMatch.tap()
+            sleep(2)
+        }
+
+        var counts: [Int] = []
+        for round in 0..<3 {
+            let reachedFooter = scrollToFooter(app)
+            XCTAssertTrue(reachedFooter, "footer not reachable in load-more round \(round)")
+            if !reachedFooter { break }
+            // The loading footer exposes "已加载 N 部" as well, so read the
+            // count before the in-flight page moves the footer off-screen.
+            if let count = loadedAlbumCount(app) {
+                counts.append(count)
+                print("LOAD_MORE_ROUND \(round) COUNT \(count)")
+            }
+            waitForFooterToSettle(app)
+            if let errorText = loadMoreErrorText(app) {
+                print("LOAD_MORE_ERROR_ROUND \(round): \(errorText)")
+                capture(name: "ui-08-load-error-round-\(round)")
+                XCTFail("load-more failed in round \(round): \(errorText)")
+                break
+            }
+            capture(name: "ui-08-load-round-\(round)")
+            sleep(1)
+        }
+        print("LOAD_MORE_COUNTS: \(counts)")
+        if let first = counts.first, let last = counts.last {
+            XCTAssertGreaterThan(
+                last, first,
+                "album count should grow across load-more rounds"
+            )
+        }
+
+        // ---- pull to refresh must recover without an error banner ----
+        scrollToTop(app)
+        sleep(1)
+        app.swipeDown()
+        sleep(6)
+        XCTAssertNil(
+            loadMoreErrorText(app),
+            "pull-to-refresh left an error message on screen"
+        )
+        capture(name: "ui-09-refresh")
+
         dumpTree(app, label: "CATEGORY TREE (after interactions)")
     }
 
-    // MARK: Helpers
+    // MARK: Load-more helpers
+
+    private func scrollToFooter(_ app: XCUIApplication) -> Bool {
+        for _ in 0..<14 {
+            if footerElement(app) != nil { return true }
+            app.swipeUp()
+            usleep(700_000)
+        }
+        return footerElement(app) != nil
+    }
+
+    private func footerElement(_ app: XCUIApplication) -> XCUIElement? {
+        let loadMore = app.buttons["load-more-button"].firstMatch
+        if loadMore.exists { return loadMore }
+        let combined = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "label CONTAINS '正在加载更多' OR "
+                    + "label BEGINSWITH '已经到底了' OR "
+                    + "label CONTAINS '加载失败'"
+            )
+        ).firstMatch
+        return combined.exists ? combined : nil
+    }
+
+    private func footerIsLoading(_ app: XCUIApplication) -> Bool {
+        app.staticTexts.matching(
+            NSPredicate(
+                format: "label CONTAINS '正在加载更多' OR label CONTAINS '正在筛选'"
+            )
+        ).firstMatch.exists
+    }
+
+    private func waitForFooterToSettle(_ app: XCUIApplication) {
+        for _ in 0..<12 {
+            if !footerIsLoading(app) { break }
+            sleep(1)
+        }
+        sleep(1)
+    }
+
+    private func loadMoreErrorText(_ app: XCUIApplication) -> String? {
+        let stack = app.staticTexts
+        for index in 0..<stack.count {
+            let label = stack.element(boundBy: index).label
+            if label.contains("加载失败") || label.contains("HTTP 4")
+                || label.contains("限流") || label.contains("超时") {
+                return label
+            }
+        }
+        if app.buttons["加载失败，点击重试"].exists {
+            return "加载失败，点击重试"
+        }
+        return nil
+    }
+
+    private func loadedAlbumCount(_ app: XCUIApplication) -> Int? {
+        let matches = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "label MATCHES '.*(已加载|共) [0-9]+ 部.*'"
+            )
+        ).allElementsBoundByIndex
+        for element in matches {
+            if let value = parseLoadedCount(element.label) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func parseLoadedCount(_ label: String) -> Int? {
+        let pattern = "(?:已加载|共)\\s*([0-9]+)\\s*部"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+        let range = NSRange(label.startIndex..<label.endIndex, in: label)
+        guard let match = regex.firstMatch(in: label, range: range),
+              let valueRange = Range(match.range(at: 1), in: label) else {
+            return nil
+        }
+        return Int(label[valueRange])
+    }
+
+    // MARK: Generic helpers
 
     private func albumCardCount(_ app: XCUIApplication) -> Int {
         app.buttons.matching(albumCardPredicate).count
@@ -152,7 +281,7 @@ final class CategoryScreenUITests: XCTestCase {
             statusBar.tap()
             sleep(1)
         }
-        for _ in 0..<4 where !app.buttons["翻译"].firstMatch.exists {
+        for _ in 0..<6 where !app.buttons["翻译"].firstMatch.exists {
             app.swipeDown()
             sleep(1)
         }

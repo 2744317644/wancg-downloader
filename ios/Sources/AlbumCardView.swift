@@ -30,6 +30,12 @@ struct AlbumCardView: View {
     }
 }
 
+extension AlbumCardView: Equatable {
+    static func == (lhs: AlbumCardView, rhs: AlbumCardView) -> Bool {
+        lhs.album == rhs.album
+    }
+}
+
 struct HomeCover: View {
     let album: HomeAlbum
     @State private var image: UIImage?

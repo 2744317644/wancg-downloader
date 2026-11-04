@@ -14,11 +14,10 @@ enum MangaLanguageFilter: String, CaseIterable, Identifiable {
         case .japanese: return "日语"
         }
     }
-}
 
-extension HomeAlbum {
     /// 站点列表没有语言字段，按标题里的常见标记做一次轻量分类。
-    var language: MangaLanguageFilter {
+    /// 在 `HomeAlbum` 解析时调用一次并缓存，避免每帧重复扫描标题。
+    static func detect(in title: String) -> MangaLanguageFilter {
         let text = title.lowercased()
         let translatedMarkers = [
             "中国翻訳", "中国翻译", "中文", "漢化", "汉化", "翻譯", "翻译",
@@ -29,13 +28,11 @@ extension HomeAlbum {
         }
         return .japanese
     }
+}
 
+extension HomeAlbum {
     func matches(language: MangaLanguageFilter) -> Bool {
         language == .all || self.language == language
-    }
-
-    var isAI: Bool {
-        AIContentFilter.matches(title)
     }
 }
 

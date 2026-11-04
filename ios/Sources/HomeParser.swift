@@ -9,6 +9,32 @@ struct HomeAlbum: Identifiable, Hashable {
     let pages: Int?
     let date: String
     let pageURL: URL
+    /// Classified once at parse time. The old computed properties re-ran the
+    /// full title-marker scan (~100 `contains`) for every album on every view
+    /// update, which is main-thread work that showed up as dropped frames
+    /// while a page of 20 covers was being appended.
+    let language: MangaLanguageFilter
+    let isAI: Bool
+
+    init(
+        aid: String,
+        title: String,
+        coverURL: URL?,
+        info: String,
+        pages: Int?,
+        date: String,
+        pageURL: URL
+    ) {
+        self.aid = aid
+        self.title = title
+        self.coverURL = coverURL
+        self.info = info
+        self.pages = pages
+        self.date = date
+        self.pageURL = pageURL
+        self.language = MangaLanguageFilter.detect(in: title)
+        self.isAI = AIContentFilter.matches(title)
+    }
 }
 
 struct HomeSection: Identifiable {

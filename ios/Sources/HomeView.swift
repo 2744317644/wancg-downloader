@@ -179,14 +179,18 @@ final class CoverImageStore {
             guard let client else { return nil }
             let data = try await client.imageData(url, referer: referer)
             try Task.checkCancellation()
-            let image = await Task.detached(priority: .background) {
-                Self.downsample(data)
+            // Downsample *and* JPEG-encode on the background queue. Encoding
+            // used to run on the main actor; when a page of 20 covers landed
+            // at once it produced visible scroll hitches.
+            let prepared = await Task.detached(priority: .background) {
+                Self.prepareThumbnail(data)
             }.value
-            guard let image else { return nil }
+            guard let prepared else { return nil }
+            let image = prepared.image
             let cost = Int(image.size.width * image.size.height * 4)
             cache.setObject(image, forKey: url as NSURL, cost: cost)
 
-            if let thumbnail = image.jpegData(compressionQuality: 0.82) {
+            if let thumbnail = prepared.thumbnailData {
                 let directory = coverCacheDirectory
                 Task.detached(priority: .utility) {
                     let destination = Self.diskURL(for: url, in: directory)
@@ -214,6 +218,13 @@ final class CoverImageStore {
             return nil
         }
         return UIImage(contentsOfFile: path)
+    }
+
+    nonisolated private static func prepareThumbnail(
+        _ data: Data
+    ) -> (image: UIImage, thumbnailData: Data?)? {
+        guard let image = downsample(data) else { return nil }
+        return (image, image.jpegData(compressionQuality: 0.82))
     }
 
     nonisolated private static func downsample(_ data: Data) -> UIImage? {
@@ -434,7 +445,7 @@ struct HomeView: View {
                     NavigationLink {
                         AlbumDetailView(album: album)
                     } label: {
-                        AlbumCardView(album: album)
+                        AlbumCardView(album: album).equatable()
                     }
                         .buttonStyle(AlbumCardButtonStyle())
                     }

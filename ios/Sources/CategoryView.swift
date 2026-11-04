@@ -6,6 +6,7 @@ import UIKit
 @MainActor
 final class CategoryFeedModel: ObservableObject {
     @Published private(set) var albums: [HomeAlbum] = []
+    @Published private(set) var visibleAlbums: [HomeAlbum] = []
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published private(set) var hasMore = true
@@ -14,9 +15,19 @@ final class CategoryFeedModel: ObservableObject {
 
     private let startURL: URL
     private var nextURL: URL?
+    /// Last successfully fetched site page; used as Referer for the next one.
+    private var currentPageURL: URL?
     private var client: WnacgClient?
     private var generation = 0
     private var loadedAids = Set<String>()
+    private var filterLanguage: MangaLanguageFilter = .all
+    private var filterHideAI = false
+    private var lastLoadFinishedAt: Date?
+
+    /// Pages are fetched one at a time; a minimum gap keeps rapid scroll
+    /// events from firing a burst of requests at the site (which answers with
+    /// HTTP 429 and made "load more" look permanently broken).
+    private let minimumRequestInterval: TimeInterval = 1.1
 
     init(startURL: URL) {
         self.startURL = startURL
@@ -36,7 +47,35 @@ final class CategoryFeedModel: ObservableObject {
 
     func loadMore() async {
         guard didLoadOnce, hasMore, !isLoading else { return }
+        await throttleIfNeeded()
+        guard !isLoading, hasMore else { return }
         await load(reset: false)
+    }
+
+    func setFilters(language: MangaLanguageFilter, hideAI: Bool) {
+        guard language != filterLanguage || hideAI != filterHideAI else { return }
+        filterLanguage = language
+        filterHideAI = hideAI
+        recomputeVisibleAlbums()
+    }
+
+    private func recomputeVisibleAlbums() {
+        var result = albums
+        if filterLanguage != .all {
+            result = result.filter { $0.matches(language: filterLanguage) }
+        }
+        if filterHideAI {
+            result = result.filter { !$0.isAI }
+        }
+        visibleAlbums = result
+    }
+
+    private func throttleIfNeeded() async {
+        guard let last = lastLoadFinishedAt else { return }
+        let elapsed = Date().timeIntervalSince(last)
+        guard elapsed < minimumRequestInterval else { return }
+        let wait = minimumRequestInterval - elapsed
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
     }
 
     private func load(reset: Bool, force: Bool = false) async {
@@ -46,12 +85,13 @@ final class CategoryFeedModel: ObservableObject {
         isLoading = true
         error = nil
 
-        let url = reset ? startURL : nextURL
-        guard let url else {
+        guard let url = reset ? startURL : nextURL else {
             hasMore = false
             isLoading = false
+            lastLoadFinishedAt = Date()
             return
         }
+        let referer = reset ? nil : (currentPageURL ?? startURL)
 
         do {
             if client == nil {
@@ -59,13 +99,17 @@ final class CategoryFeedModel: ObservableObject {
             }
             guard let client else {
                 isLoading = false
+                lastLoadFinishedAt = Date()
                 return
             }
-            let html = try await client.fetchHTML(url)
+            let html = try await client.fetchHTML(url, referer: referer)
             guard token == generation else { return }
 
             let parsed = HomeParser.parseCards(html)
             let next = HomeParser.nextPageURL(html, current: url)
+            // Never keep a cursor that points back at the page we just read:
+            // that made the sentinel spin on the same page forever.
+            let usableNext = (next != nil && next != url) ? next : nil
 
             if reset {
                 var seen = Set<String>()
@@ -73,15 +117,25 @@ final class CategoryFeedModel: ObservableObject {
                 loadedAids = seen
                 albums = unique
                 loadedPageCount = 1
+                currentPageURL = url
+                nextURL = usableNext
+                hasMore = usableNext != nil
+            } else if parsed.isEmpty {
+                // An empty 200 page means there is nothing usable further down.
+                currentPageURL = url
+                nextURL = nil
+                hasMore = false
             } else {
                 let fresh = parsed.filter { loadedAids.insert($0.aid).inserted }
                 albums.append(contentsOf: fresh)
                 loadedPageCount += 1
+                currentPageURL = url
+                nextURL = usableNext
+                hasMore = usableNext != nil
             }
 
-            nextURL = next
-            hasMore = next != nil
             didLoadOnce = true
+            recomputeVisibleAlbums()
         } catch let err {
             guard token == generation else { return }
             // Cancellation must still fall through to the isLoading reset —
@@ -91,6 +145,7 @@ final class CategoryFeedModel: ObservableObject {
             }
         }
 
+        lastLoadFinishedAt = Date()
         if token == generation {
             isLoading = false
         }
@@ -103,10 +158,7 @@ final class CategoryFeedModel: ObservableObject {
 /// a home section's 更多) and by search results.
 ///
 /// A single continuous, adaptive grid is the model here: the site's page
-/// numbers are only a data cursor and never surface in the UI. That removes
-/// the whole class of bugs the old "9 items per page + floating pager" design
-/// kept producing (wrong page counters, tiny 32pt arrows, a second bottom bar
-/// stacked on the native tab bar, empty pages after filtering, …).
+/// numbers are only a data cursor and never surface in the UI.
 struct CategoryView: View {
     let title: String
     let appliesLanguageFilter: Bool
@@ -143,8 +195,11 @@ struct CategoryView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 16) {
-                    filterRow(proxy: proxy)
+                // A plain VStack: the only lazy container needed here is the
+                // grid itself. Nesting the grid inside a LazyVStack made every
+                // appended page re-layout the whole lazy stack.
+                VStack(spacing: 16) {
+                    filterRow
                         .id("category-top")
                     content
                 }
@@ -178,7 +233,14 @@ struct CategoryView: View {
                     .disabled(model.isLoading)
                 }
             }
+            .onChange(of: languageFilter) { _, _ in
+                handleFilterChange(proxy: proxy)
+            }
+            .onChange(of: hideAI) { _, _ in
+                handleFilterChange(proxy: proxy)
+            }
             .task {
+                syncModelFilters()
                 await model.loadInitial()
                 await fillFilteredPages(limit: 2)
             }
@@ -214,22 +276,15 @@ struct CategoryView: View {
         }
     }
 
-    /// Bottom sentinel, lazily rendered by the LazyVStack only when the user
-    /// gets near the end. `task(id:)` re-arms itself after every fetched page,
-    /// which keeps loading alive when a whole site page is filtered out (the
-    /// old last-cell `onAppear` would stall in that case).
+    /// Stable bottom sentinel: no `.id(...)` recreation, so a successful page
+    /// append cannot instantly retrigger itself. It only fires again after the
+    /// lazy view legitimately re-appears when the user scrolls back to the end.
     @ViewBuilder
     private var loadMoreSentinel: some View {
         if model.hasMore {
             Color.clear
                 .frame(height: 1)
                 .accessibilityHidden(true)
-                // Re-created after every fetched page: if it is still in the
-                // viewport (user is at the bottom, or the page was filtered
-                // out entirely) `onAppear` fires again and the next page is
-                // pulled. Off-screen sentinels stay dormant, so the feed can
-                // never chain-load in the background.
-                .id("load-more-\(model.loadedPageCount)-\(model.albums.count)")
                 .onAppear { requestMore() }
         }
     }
@@ -240,7 +295,9 @@ struct CategoryView: View {
                 NavigationLink {
                     AlbumDetailView(album: album)
                 } label: {
-                    AlbumCardView(album: album)
+                    // `.equatable()` lets SwiftUI skip re-rendering the covers
+                    // already on screen whenever a page is appended.
+                    AlbumCardView(album: album).equatable()
                 }
                 .buttonStyle(AlbumCardButtonStyle())
             }
@@ -286,9 +343,6 @@ struct CategoryView: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                     languageFilter = MangaLanguageFilter.all.rawValue
                     hideAI = false
-                    Task { @MainActor in
-                        await fillFilteredPages(limit: 2)
-                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.mint)
@@ -344,8 +398,6 @@ struct CategoryView: View {
                 .lineLimit(3)
                 .padding(.horizontal, 24)
             Button("重试") {
-                // fillFilteredPages stops when `error != nil`, so retry through
-                // requestMore(force:) which starts a fresh page load instead.
                 requestMore(force: true)
             }
             .buttonStyle(.borderedProminent)
@@ -387,73 +439,94 @@ struct CategoryView: View {
     @ViewBuilder
     private var footer: some View {
         if model.isLoading && !isRefreshing {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text(isAutoFilling ? "正在筛选…" : "正在加载更多…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 5) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(isAutoFilling ? "正在筛选…" : "正在加载更多…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text("已加载 \(model.albums.count) 部")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .accessibilityLabel("正在加载更多")
+            .padding(.vertical, 16)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("正在加载更多，已加载 \(model.albums.count) 部")
         } else if let error = model.error {
             Button {
                 requestMore(force: true)
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "wifi.exclamationmark")
-                    Text("加载失败，点击重试")
+                VStack(spacing: 4) {
+                    Label("加载失败，点击重试", systemImage: "arrow.clockwise")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
                     Text(error)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
                 }
-                .font(.caption)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("加载失败，点击重试")
-        } else if !model.hasMore {
+        } else if model.hasMore {
+            Button {
+                requestMore(force: true)
+            } label: {
+                VStack(spacing: 3) {
+                    Label("加载更多", systemImage: "arrow.down.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("已加载 \(model.albums.count) 部")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("load-more-button")
+            .accessibilityLabel("加载更多，已加载 \(model.albums.count) 部")
+        } else {
             Text("已经到底了 · 共 \(visibleAlbums.count) 部")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
                 .accessibilityLabel("已经到底了，共 \(visibleAlbums.count) 部作品")
-        } else {
-            Color.clear.frame(height: 20)
         }
     }
 
     // MARK: Filter chips
 
-    private func filterRow(proxy: ScrollViewProxy) -> some View {
+    private var filterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(MangaLanguageFilter.allCases) { filter in
-                    languagePill(filter, proxy: proxy)
+                if appliesLanguageFilter {
+                    ForEach(MangaLanguageFilter.allCases) { filter in
+                        languagePill(filter)
+                    }
                 }
-                aiPill(proxy: proxy)
+                aiPill
             }
             .padding(.vertical, 2)
         }
         .scrollClipDisabled()
     }
 
-    private func languagePill(
-        _ filter: MangaLanguageFilter,
-        proxy: ScrollViewProxy
-    ) -> some View {
+    private func languagePill(_ filter: MangaLanguageFilter) -> some View {
         let selected = selectedLanguage == filter
         return Button {
             guard languageFilter != filter.rawValue else { return }
             UISelectionFeedbackGenerator().selectionChanged()
             languageFilter = filter.rawValue
-            applyFilterChange(proxy: proxy)
         } label: {
             HStack(spacing: 4) {
                 if selected {
@@ -477,11 +550,10 @@ struct CategoryView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func aiPill(proxy: ScrollViewProxy) -> some View {
+    private var aiPill: some View {
         Button {
             UISelectionFeedbackGenerator().selectionChanged()
             hideAI.toggle()
-            applyFilterChange(proxy: proxy)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: hideAI ? "checkmark" : "sparkles")
@@ -505,16 +577,19 @@ struct CategoryView: View {
 
     // MARK: Helpers
 
-    private func applyFilterChange(proxy: ScrollViewProxy) {
+    private func handleFilterChange(proxy: ScrollViewProxy) {
+        syncModelFilters()
         Task { @MainActor in
             await fillFilteredPages(limit: 6)
             scrollToTop(proxy: proxy)
         }
     }
 
+    private func syncModelFilters() {
+        model.setFilters(language: selectedLanguage, hideAI: hideAI)
+    }
+
     private func scrollToTop(proxy: ScrollViewProxy) {
-        // Anchor above the chips (not the first album) so the changed filter
-        // state is visible again after switching filters.
         guard appliesLanguageFilter || !visibleAlbums.isEmpty else { return }
         if reduceMotion {
             proxy.scrollTo("category-top", anchor: .top)
@@ -554,16 +629,7 @@ struct CategoryView: View {
     }
 
     private var visibleAlbums: [HomeAlbum] {
-        let languageFiltered: [HomeAlbum]
-        if selectedLanguage == .all {
-            languageFiltered = model.albums
-        } else {
-            languageFiltered = model.albums.filter {
-                $0.matches(language: selectedLanguage)
-            }
-        }
-        guard hideAI else { return languageFiltered }
-        return languageFiltered.filter { !$0.isAI }
+        model.visibleAlbums
     }
 
     private var background: some View {
