@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   screenshots:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - name: Checkout
@@ -162,7 +162,7 @@ jobs:
     # target is iOS 17, so also run the category regression on the oldest
     # runtime available on the runner (currently iOS 18.x) to catch
     # availability/design regressions that the iOS 26 glass UI hides.
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - name: Checkout
