@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-11-04（第五轮：阅读器沉浸模式 + 下载仪表盘 + 详情封面氛围）
+
+### 阅读器
+
+- 单击页面进入沉浸模式：隐藏导航栏、状态栏和工具栏；再单击恢复（`chromeHidden` + `.toolbar(.hidden)` + `.statusBarHidden`）。
+- 右缘页码拖动条加宽到 32pt，并加 6pt 触发阈值，减少误触跳页。
+- 保留滚动进度 HUD。
+
+### 下载页
+
+- 新增「最近下载」卡片：最近 3 个 ZIP/PDF、大小、时间、分享按钮，「全部文件」跳到文件 tab（`ContentView` 增加 `selectedTab` binding）。
+- 下载 tab 角标 = 进行中任务 + 排队数量。
+
+### 详情页
+
+- 封面模糊渐隐 hero 背景（`CoverImageStore` 取封面，opacity 0.30 / blur 28 / mask 渐隐），作为 header 的 background 不改变布局。
+
+### 编译插曲
+
+- `ForEach(recentFiles)` 在 Xcode 26.3/SwiftUI 下被错误解析为 Binding overload；依次尝试 `id: \.url`、`indices`、`Range` 均失败，最终改为**展开最多 3 行**（列表本来固定 3 条）+ 补 `RecentDownload.name` 访问器后编译通过。
+- 期间本机 FlClash 代理端口短暂未监听导致 push 失败，恢复 7890 后推送成功。
+
+### 验证与发布
+
+- iOS 26.2 全流程 UI 测试通过；iOS 18.x 分类页回归通过；Release 编译/smoke test 通过。
+- **v1.24.0（build 262）**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.24.0>
+
+---
+
 ## 2026-11-04（第四轮：主线程零阻塞 + 体验增强 + 双 iOS CI）
 
 ### 稳定性
