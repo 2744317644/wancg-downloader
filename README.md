@@ -104,6 +104,14 @@ GitHub Actions 每次构建都会先跑一个 macOS smoke test：
 
 这几步通过后才会打包 IPA，因此下载链路、解析、解压都是实际跑通过的。
 
+### 模拟器 UI 测试与截图（Windows 也能用）
+
+本机没有 Mac 也能在真实 iOS Simulator 里跑 UI 测试并导出截图：GitHub Actions 的
+`UI Preview Screenshots` workflow 会在 macOS runner 上启动最新/最旧 iOS 模拟器，
+运行 `ios/UITests` 下的 XCUITest，并上传截图、无障碍树和系统日志。
+
+完整原理、配置与排错见：[docs/ios-simulator-ci-guide.md](docs/ios-simulator-ci-guide.md)。
+
 ### 本地构建（需要 Mac）
 
 需要 **Xcode 26.3+**（iOS 26 SDK）。GitHub Actions 使用 `macos-15` runner，
