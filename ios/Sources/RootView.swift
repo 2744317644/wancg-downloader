@@ -5,15 +5,20 @@ struct RootView: View {
     @State private var selection = 0
     @AppStorage("debug.showFPS") private var showFPS = false
 
+    private var downloadBadge: Int {
+        downloadModel.queue.count + (downloadModel.hasActiveDownload ? 1 : 0)
+    }
+
     var body: some View {
         let tabs = TabView(selection: $selection) {
             HomeView()
                 .tabItem { Label("首页", systemImage: "house.fill") }
                 .tag(0)
 
-            ContentView(model: downloadModel)
+            ContentView(model: downloadModel, selectedTab: $selection)
                 .tabItem { Label("下载", systemImage: "arrow.down.circle.fill") }
                 .tag(1)
+                .badge(downloadBadge)
 
             FavoritesView()
                 .tabItem { Label("收藏", systemImage: "heart.fill") }

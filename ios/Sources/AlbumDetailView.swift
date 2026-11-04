@@ -44,6 +44,7 @@ struct AlbumDetailView: View {
     @State private var downloadStartedHere = false
     @State private var showReader = false
     @State private var tagsExpanded = false
+    @State private var backdropImage: UIImage?
     @AppStorage("content.hideAI") private var hideAI = false
     @StateObject private var model: AlbumDetailModel
 
@@ -67,7 +68,7 @@ struct AlbumDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                header
+                headerWithBackdrop
                 actionButtons
                 if !tags.isEmpty { tagGrid }
                 downloadStatus
@@ -124,6 +125,9 @@ struct AlbumDetailView: View {
             await model.load()
             history.record(album: album, preview: model.preview)
         }
+        .task {
+            await loadBackdrop()
+        }
         .alert("已经下载过", isPresented: $showAlreadyDownloaded) {
             Button("取消", role: .cancel) {}
             Button("重新下载", role: .destructive) {
@@ -141,6 +145,44 @@ struct AlbumDetailView: View {
             NavigationStack {
                 ReaderView(aid: album.aid, title: displayTitle)
             }
+        }
+    }
+
+    /// A blurred, faded cover backdrop gives the detail page a hero feel
+    /// without changing the header layout: it is drawn as a background so the
+    /// ZStack never grows past the normal header height.
+    private var headerWithBackdrop: some View {
+        header.background(alignment: .topLeading) {
+            if let backdropImage {
+                Image(uiImage: backdropImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 280)
+                    .frame(maxWidth: .infinity)
+                    .blur(radius: 28, opaque: true)
+                    .opacity(0.30)
+                    .mask(
+                        LinearGradient(
+                            colors: [.black, .black.opacity(0.35), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func loadBackdrop() async {
+        guard backdropImage == nil, let coverURL = album.coverURL else {
+            return
+        }
+        let referer = URL(string: "https://www.wnacg.com/") ?? coverURL
+        guard let image = await CoverImageStore.shared.image(
+            for: coverURL, referer: referer
+        ) else { return }
+        withAnimation(.easeIn(duration: 0.25)) {
+            backdropImage = image
         }
     }
 

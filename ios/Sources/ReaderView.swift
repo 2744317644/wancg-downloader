@@ -241,6 +241,9 @@ struct ReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: ReaderModel
     @State private var scrollController = ReaderScrollController()
+    /// Single tap on a page toggles an immersive full-screen mode (hides the
+    /// navigation bar, status bar and toolbar) so the artwork fills the screen.
+    @State private var chromeHidden = false
 
     init(aid: String, title: String) {
         self.aid = aid
@@ -275,6 +278,14 @@ struct ReaderView: View {
             )
         }
         .scrollIndicators(.hidden)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    chromeHidden.toggle()
+                }
+            }
+        )
         .overlay(alignment: .trailing) {
             ReaderPageSlider(controller: scrollController)
                 .padding(.trailing, 2)
@@ -298,6 +309,8 @@ struct ReaderView: View {
         // (iOS 26's glass toolbar masked the bug).
         .preferredColorScheme(.dark)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(chromeHidden ? .hidden : .visible, for: .navigationBar)
+        .statusBarHidden(chromeHidden)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -430,7 +443,9 @@ private struct ReaderPageSlider: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                // A small movement threshold keeps a stray tap near the edge
+                // from jumping the reader to an arbitrary page.
+                DragGesture(minimumDistance: 6)
                     .onChanged { value in
                         let fraction = min(
                             1, max(0, value.location.y / height)
@@ -439,7 +454,7 @@ private struct ReaderPageSlider: View {
                     }
             )
         }
-        .frame(width: 24)
+        .frame(width: 32)
         .padding(.vertical, 8)
         .opacity(controller.isScrollable ? 1 : 0)
         .allowsHitTesting(controller.isScrollable)

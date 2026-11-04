@@ -3,8 +3,10 @@ import UIKit
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    @Binding var selectedTab: Int
     @EnvironmentObject private var downloads: DownloadHistory
     @State private var showAlreadyDownloaded = false
+    @State private var recentFiles: [RecentDownload] = []
     @FocusState private var linkFieldFocused: Bool
 
     var body: some View {
@@ -20,6 +22,10 @@ struct ContentView: View {
                         if !model.queue.isEmpty {
                             queueCard
                         }
+                        if model.preview == nil, !model.isBusy,
+                           model.errorMessage == nil, !recentFiles.isEmpty {
+                            recentCard
+                        }
                         if let error = model.errorMessage {
                             errorCard(error)
                         }
@@ -30,6 +36,12 @@ struct ContentView: View {
                     .padding(.bottom, 32)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .task { refreshRecentFiles() }
+                .onReceive(
+                    NotificationCenter.default.publisher(for: .downloadsChanged)
+                ) { _ in
+                    refreshRecentFiles()
+                }
             }
             .navigationTitle("下载")
             .navigationBarTitleDisplayMode(.inline)
@@ -326,6 +338,65 @@ struct ContentView: View {
         return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
+    private var recentCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label("最近下载", systemImage: "clock.arrow.circlepath")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("全部文件") {
+                    selectedTab = 3
+                }
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.mint)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+            }
+
+            ForEach(recentFiles) { item in
+                HStack(spacing: 10) {
+                    Image(systemName: item.isPDF
+                        ? "doc.richtext" : "doc.zipper")
+                        .font(.title3)
+                        .foregroundStyle(.mint)
+                        .frame(width: 30)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(.caption)
+                            .lineLimit(1)
+                        Text("\(item.sizeLabel) · \(item.dateLabel)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    ShareLink(item: item.url) {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        }
+        .padding(14)
+        .background(cardBackground)
+    }
+
+    private func refreshRecentFiles() {
+        let files = DownloadFolders.allFiles().compactMap { url -> RecentDownload? in
+            let attributes = try? FileManager.default.attributesOfItem(
+                atPath: url.path
+            )
+            guard let date = attributes?[.modificationDate] as? Date else {
+                return nil
+            }
+            let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+            return RecentDownload(url: url, size: size, date: date)
+        }.sorted { $0.date > $1.date }
+        recentFiles = Array(files.prefix(3))
+    }
+
     private var queueCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -421,6 +492,21 @@ struct ContentView: View {
     }
 }
 
+private struct RecentDownload: Identifiable {
+    let url: URL
+    let size: Int64
+    let date: Date
+
+    var id: URL { url }
+    var isPDF: Bool { url.pathExtension.lowercased() == "pdf" }
+    var sizeLabel: String {
+        ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+    var dateLabel: String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
 #Preview {
-    ContentView(model: AppModel())
+    ContentView(model: AppModel(), selectedTab: .constant(0))
 }
