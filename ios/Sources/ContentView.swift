@@ -354,34 +354,39 @@ struct ContentView: View {
                 .buttonStyle(.plain)
             }
 
-            ForEach(0..<recentFiles.count, id: \.self) { index in
-                let item = recentFiles[index]
-                HStack(spacing: 10) {
-                    Image(systemName: item.isPDF
-                        ? "doc.richtext" : "doc.zipper")
-                        .font(.title3)
-                        .foregroundStyle(.mint)
-                        .frame(width: 30)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name)
-                            .font(.caption)
-                            .lineLimit(1)
-                        Text("\(item.sizeLabel) · \(item.dateLabel)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    ShareLink(item: item.url) {
-                        Image(systemName: "square.and.arrow.up")
-                            .frame(width: 32, height: 32)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
+            // The list is capped at three items, so unroll instead of using
+            // ForEach: the generic ForEach initializers tripped a SwiftUI
+            // overload-resolution bug here (it selected the Binding overload).
+            if recentFiles.count > 0 { recentRow(recentFiles[0]) }
+            if recentFiles.count > 1 { recentRow(recentFiles[1]) }
+            if recentFiles.count > 2 { recentRow(recentFiles[2]) }
         }
         .padding(14)
         .background(cardBackground)
+    }
+
+    private func recentRow(_ item: RecentDownload) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.isPDF ? "doc.richtext" : "doc.zipper")
+                .font(.title3)
+                .foregroundStyle(.mint)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name)
+                    .font(.caption)
+                    .lineLimit(1)
+                Text("\(item.sizeLabel) · \(item.dateLabel)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            ShareLink(item: item.url) {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+        }
     }
 
     private func refreshRecentFiles() {
