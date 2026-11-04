@@ -32,23 +32,60 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
-      - name: Boot simulator
+      - name: Show available simulator runtimes
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available | head -60
+
+      - name: Boot newest iOS simulator
         id: sim
         run: |
-          DEVICE_ID="$(xcrun simctl list devices available -j | /usr/bin/python3 -c '
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = [d for runtime in data["devices"].values() for d in runtime if "iPhone" in d["name"]]
-          print(devices[0]["udid"] if devices else "")')"
-          if [ -z "$DEVICE_ID" ]; then
-            echo "no iPhone simulator found" >&2
-            exit 1
-          fi
-          echo "device=$DEVICE_ID"
+          # Always pick the highest available iOS runtime (e.g. iOS 26.x with
+          # Xcode 26.3), not whatever device `simctl` happens to list first —
+          # the first entry was iOS 18.5, which cannot render the Liquid Glass
+          # tab bar users see on their own devices.
+          SELECTION="$(/usr/bin/python3 - <<'PY'
+          import json
+          import re
+          import subprocess
+
+          runtimes = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"])
+          )["runtimes"]
+
+          def version_key(runtime):
+              match = re.match(r"(\d+)(?:\.(\d+))?", runtime.get("version", "0"))
+              return (int(match.group(1)), int(match.group(2) or 0)) if match else (0, 0)
+
+          ios = sorted(
+              [r for r in runtimes if r.get("isAvailable") and r.get("platform") == "iOS"],
+              key=version_key,
+              reverse=True,
+          )
+          if not ios:
+              raise SystemExit("no available iOS runtime")
+          runtime = ios[0]
+          devices = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "devices", "-j"])
+          )["devices"].get(runtime["identifier"], [])
+          phones = [
+              d for d in devices
+              if d.get("isAvailable") and "iPhone" in d["name"]
+          ]
+          if not phones:
+              raise SystemExit("no available iPhone in newest iOS runtime")
+          pros = [d for d in phones if "Pro" in d["name"]]
+          device = (pros or phones)[0]
+          print(f"{device['udid']}\t{runtime['version']}\t{device['name']}")
+          PY
+          )"
+          IFS=$'\t' read -r DEVICE_ID IOS_VERSION DEVICE_NAME <<< "$SELECTION"
+          echo "selected iOS $IOS_VERSION — $DEVICE_NAME ($DEVICE_ID)"
           xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
           echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
-          echo "device_name=$(xcrun simctl list devices available | grep "$DEVICE_ID" | sed 's/ *(.*//' | xargs)" >> "$GITHUB_OUTPUT"
+          echo "ios_version=$IOS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "device_name=$DEVICE_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Run UI test and capture screenshots
         working-directory: ios
