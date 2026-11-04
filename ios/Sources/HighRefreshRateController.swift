@@ -15,7 +15,9 @@ final class HighRefreshRateController: NSObject {
     func applySavedSetting() {
         let defaults = UserDefaults.standard
         if defaults.object(forKey: Self.enabledKey) == nil {
-            defaults.set(true, forKey: Self.enabledKey)
+            // An empty CADisplayLink at 120 Hz costs battery without proving
+            // any render benefit; make the opt-in explicit in Settings.
+            defaults.set(false, forKey: Self.enabledKey)
         }
         setEnabled(defaults.bool(forKey: Self.enabledKey))
     }

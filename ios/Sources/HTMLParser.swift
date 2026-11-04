@@ -1,11 +1,28 @@
 import Foundation
 
 enum HTMLParser {
-    static func first(_ pattern: String, in text: String) -> String? {
-        guard let regex = try? NSRegularExpression(
+    /// Parsing a page used to compile the same handful of regexes over and
+    /// over (about a dozen per album card). They are immutable, so cache them
+    /// once and reuse them from both the main actor and background parses.
+    private static let regexLock = NSLock()
+    private static var regexCache: [String: NSRegularExpression] = [:]
+
+    private static func regex(_ pattern: String) -> NSRegularExpression? {
+        regexLock.lock()
+        defer { regexLock.unlock() }
+        if let cached = regexCache[pattern] {
+            return cached
+        }
+        guard let compiled = try? NSRegularExpression(
             pattern: pattern,
             options: [.caseInsensitive, .dotMatchesLineSeparators]
         ) else { return nil }
+        regexCache[pattern] = compiled
+        return compiled
+    }
+
+    static func first(_ pattern: String, in text: String) -> String? {
+        guard let regex = regex(pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = regex.firstMatch(in: text, range: range),
               match.numberOfRanges > 1,
@@ -16,10 +33,7 @@ enum HTMLParser {
     }
 
     static func all(_ pattern: String, in text: String) -> [String] {
-        guard let regex = try? NSRegularExpression(
-            pattern: pattern,
-            options: [.caseInsensitive, .dotMatchesLineSeparators]
-        ) else { return [] }
+        guard let regex = regex(pattern) else { return [] }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         return regex.matches(in: text, range: range).compactMap { match in
             guard match.numberOfRanges > 1,
@@ -35,10 +49,7 @@ enum HTMLParser {
     }
 
     static func matches(_ pattern: String, in text: String) -> [String] {
-        guard let regex = try? NSRegularExpression(
-            pattern: pattern,
-            options: [.caseInsensitive, .dotMatchesLineSeparators]
-        ) else { return [] }
+        guard let regex = regex(pattern) else { return [] }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         return regex.matches(in: text, range: range).compactMap { match in
             guard let valueRange = Range(match.range, in: text) else {
@@ -69,7 +80,7 @@ enum HTMLParser {
             text = text.replacingOccurrences(of: key, with: replacement)
         }
 
-        guard let regex = try? NSRegularExpression(pattern: "&#(x?[0-9A-Fa-f]+);") else {
+        guard let regex = regex("&#(x?[0-9A-Fa-f]+);") else {
             return text
         }
         let matches = regex.matches(

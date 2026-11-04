@@ -37,6 +37,15 @@ final class AppWalkthroughUITests: XCTestCase {
 
         // ---- Tabs ----
         visitTab(app, label: "下载", name: "download")
+        // The paste control must meet the 44pt touch-target rule.
+        let pasteButton = app.buttons["从剪贴板粘贴链接"].firstMatch
+        if pasteButton.waitForExistence(timeout: 5) {
+            XCTAssertGreaterThanOrEqual(
+                pasteButton.frame.height, 43.5,
+                "paste button touch target must be at least 44pt"
+            )
+        }
+
         // Try the download-link parser with the sample album used in the smoke test.
         let linkField = app.textFields.firstMatch
         if linkField.waitForExistence(timeout: 6) {
@@ -46,6 +55,12 @@ final class AppWalkthroughUITests: XCTestCase {
             if parseButton.waitForExistence(timeout: 5) {
                 parseButton.tap()
                 sleep(14)
+                // Tapping 解析作品 must itself dismiss the keyboard; the
+                // helper below used to hide this regression by tapping 完成.
+                XCTAssertFalse(
+                    app.keyboards.firstMatch.exists,
+                    "keyboard must be dismissed automatically after parsing"
+                )
                 dismissKeyboard(app)
                 capture(app, "ui-walk-03-download-parsed")
                 dump(app, "WALK: DOWNLOAD parsed")

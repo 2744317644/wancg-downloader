@@ -112,8 +112,17 @@ final class CategoryFeedModel: ObservableObject {
             let html = try await client.fetchHTML(url, referer: referer)
             guard token == generation else { return }
 
-            let parsed = HomeParser.parseCards(html)
-            let next = HomeParser.nextPageURL(html, current: url)
+            // Regex parsing is CPU-bound; keep it off the main actor so the
+            // append of a new page cannot block the frame mid-scroll.
+            let parsedPage = await Task.detached(priority: .userInitiated) {
+                (
+                    cards: HomeParser.parseCards(html),
+                    next: HomeParser.nextPageURL(html, current: url)
+                )
+            }.value
+            guard token == generation else { return }
+            let parsed = parsedPage.cards
+            let next = parsedPage.next
             // Never keep a cursor that points back at the page we just read:
             // that made the sentinel spin on the same page forever.
             let usableNext = (next != nil && next != url) ? next : nil
@@ -173,6 +182,10 @@ final class CategoryFeedModel: ObservableObject {
             guard self.error != nil, self.hasMore, !self.isLoading else {
                 return
             }
+            // `load()` cancels `recoveryTask` on entry. If that task is still
+            // `self`, it would cancel the recovery request itself (URLSession
+            // -999), so detach it from the property before retrying.
+            self.recoveryTask = nil
             self.error = nil
             await self.load(reset: false)
         }

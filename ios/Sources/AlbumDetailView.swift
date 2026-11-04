@@ -166,7 +166,7 @@ struct AlbumDetailView: View {
                             ? "checkmark.circle.fill" : "doc.on.doc")
                             .font(.caption)
                             .foregroundStyle(didCopyTitle ? Color.mint : Color.secondary)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -300,6 +300,7 @@ struct AlbumDetailView: View {
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
+                .frame(minHeight: 44)
                 .background(
                     Color.primary.opacity(0.05),
                     in: RoundedRectangle(cornerRadius: 12, style: .continuous)

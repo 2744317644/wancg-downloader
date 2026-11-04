@@ -2,8 +2,15 @@ import SwiftUI
 
 extension View {
     /// 去掉滚动后导航栏的模糊/分割边界，保持整页连贯。
+    /// iOS 26 的 Liquid Glass 导航栏会自己处理滚动边缘效果；17/18 上隐藏背景
+    /// 会让标题和内容重叠，所以旧系统保留系统默认背景。
+    @ViewBuilder
     func seamlessNavigationBar() -> some View {
-        toolbarBackground(.hidden, for: .navigationBar)
+        if #available(iOS 26.0, *) {
+            toolbarBackground(.hidden, for: .navigationBar)
+        } else {
+            self
+        }
     }
 }
 

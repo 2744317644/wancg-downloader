@@ -136,13 +136,21 @@ final class DownloadHistory: ObservableObject {
     }
 
     /// 老版本下载过的文件没有历史记录，按标题匹配一次本地 ZIP/PDF。
+    /// 先一次性规范化为文件名集合，避免对每个收藏重复做 O(files) 的
+    /// 文件系统扫描 + safeFilename 正则（收藏多、文件多时主线程会卡）。
     func reconcile(with favorites: [FavoriteManga]) {
         guard !favorites.isEmpty else { return }
         let files = DownloadFolders.allFiles()
+        let normalizedFileNames = Set(files.compactMap { url -> String? in
+            let ext = url.pathExtension.lowercased()
+            guard ext == "zip" || ext == "pdf" else { return nil }
+            return url.deletingPathExtension().lastPathComponent.lowercased()
+        })
+        guard !normalizedFileNames.isEmpty else { return }
 
         var changed = false
         for favorite in favorites where !downloadedAids.contains(favorite.aid) {
-            if files.contains(where: { file($0, matches: favorite.title) }) {
+            if normalizedFileNames.contains(normalizedTitle(favorite.title)) {
                 downloadedAids.insert(favorite.aid)
                 changed = true
             }

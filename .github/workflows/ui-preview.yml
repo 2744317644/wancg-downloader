@@ -6,8 +6,16 @@ name: UI Preview Screenshots
 on:
   push:
     branches:
+      - main
       - redesign/category-ui
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ui-preview.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ui-preview-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -280,6 +280,11 @@ struct ReaderView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
+        // Reader chrome is always dark; without declaring it, the inline
+        // title and page-count text were invisible in iOS 17/18 light mode
+        // (iOS 26's glass toolbar masked the bug).
+        .preferredColorScheme(.dark)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {

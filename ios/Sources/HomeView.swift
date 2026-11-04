@@ -26,7 +26,11 @@ final class HomeFeedModel: ObservableObject {
                 URL(string: "https://www.wnacg.com/")!
             )
             guard current == generation else { return }
-            sections = HomeParser.parse(html)
+            let parsed = await Task.detached(priority: .userInitiated) {
+                HomeParser.parse(html)
+            }.value
+            guard current == generation else { return }
+            sections = parsed
             loaded = true
             if sections.isEmpty {
                 error = "首页没有解析到作品，可能站点结构变了"
@@ -213,11 +217,23 @@ final class CoverImageStore {
         for url: URL,
         in directory: URL
     ) -> UIImage? {
-        let path = diskURL(for: url, in: directory).path
-        guard FileManager.default.fileExists(atPath: path) else {
+        let fileURL = diskURL(for: url, in: directory)
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return nil
         }
-        return UIImage(contentsOfFile: path)
+        guard let source = CGImageSourceCreateWithURL(
+            fileURL as CFURL, nil
+        ) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 360,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source, 0, options as CFDictionary
+        ) else { return nil }
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
     }
 
     nonisolated private static func prepareThumbnail(
@@ -395,6 +411,8 @@ struct HomeView: View {
             .overlay(
                 Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1)
             )
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     private func sectionView(_ section: HomeSection) -> some View {
@@ -413,9 +431,6 @@ struct HomeView: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 8)
-                Text("\(section.albums.count) 部")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
                 if let moreURL = section.moreURL {
                     NavigationLink {
                         CategoryView(
@@ -431,7 +446,7 @@ struct HomeView: View {
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.mint)
                         .padding(.leading, 6)
-                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

@@ -56,6 +56,12 @@ final class WnacgClient {
     /// 后台/息屏后本地代理可能已经失效；遇到 310 重启代理，
     /// 遇到 HTTP 429 时按 Retry-After / 指数退避重试。
     private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        if ProxySession.shared.startupError != nil {
+            // A single failed local-proxy start used to be sticky forever:
+            // every later request threw before the retry loop, so only a
+            // background→foreground restart could heal the app. Try once here.
+            ProxySession.shared.restart()
+        }
         if let startupError = ProxySession.shared.startupError {
             throw startupError
         }
@@ -87,7 +93,12 @@ final class WnacgClient {
                 let proxyFailure =
                     code == 310 || code == -310
                     || (nsError.domain == NSURLErrorDomain
-                        && [-1001, -1004, -1005, -1009, -1200].contains(code))
+                        // -999: the shared URLSession is invalidated when the
+                        // proxy restarts, which kills sibling in-flight
+                        // requests. Retry those too instead of surfacing a
+                        // bogus "cancelled" failure for covers/feed requests.
+                        && [-999, -1001, -1004, -1005, -1009, -1200]
+                            .contains(code))
                 guard proxyFailure, proxyAttempt < 2 else { throw error }
                 proxyAttempt += 1
                 ProxySession.shared.restart()

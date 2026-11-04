@@ -7,21 +7,23 @@ extension Notification.Name {
 
 private struct DownloadedFile: Identifiable {
     let url: URL
+    /// File-system metadata is read once in `init`; previously `date`/`size`
+    /// hit the disk on every access, including inside the sort comparator.
+    let size: Int64
+    let date: Date
+
+    init(url: URL) {
+        self.url = url
+        let attributes = try? FileManager.default.attributesOfItem(
+            atPath: url.path
+        )
+        size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        date = (attributes?[.modificationDate] as? Date) ?? .distantPast
+    }
+
     var id: URL { url }
     var name: String { url.lastPathComponent }
     var isPDF: Bool { url.pathExtension.lowercased() == "pdf" }
-    var size: Int64 {
-        guard let attributes = try? FileManager.default.attributesOfItem(
-            atPath: url.path
-        ) else { return 0 }
-        return (attributes[.size] as? NSNumber)?.int64Value ?? 0
-    }
-    var date: Date {
-        guard let attributes = try? FileManager.default.attributesOfItem(
-            atPath: url.path
-        ) else { return .distantPast }
-        return (attributes[.modificationDate] as? Date) ?? .distantPast
-    }
 }
 
 private struct PDFItem: Identifiable {

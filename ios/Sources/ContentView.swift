@@ -71,7 +71,7 @@ struct ContentView: View {
                 } label: {
                     Label("粘贴", systemImage: "doc.on.clipboard")
                         .font(.caption.weight(.medium))
-                        .padding(.vertical, 6)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
