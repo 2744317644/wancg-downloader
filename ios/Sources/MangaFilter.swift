@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 enum MangaLanguageFilter: String, CaseIterable, Identifiable {
     case all
