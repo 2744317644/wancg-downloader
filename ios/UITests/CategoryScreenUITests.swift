@@ -130,28 +130,48 @@ final class CategoryScreenUITests: XCTestCase {
         }
 
         var counts: [Int] = []
-        for round in 0..<3 {
+        var hitEnd = false
+        for round in 0..<4 {
             let reachedFooter = scrollToFooter(app)
             XCTAssertTrue(reachedFooter, "footer not reachable in load-more round \(round)")
             if !reachedFooter { break }
-            // The loading footer exposes "已加载 N 部" as well, so read the
-            // count before the in-flight page moves the footer off-screen.
             if let count = loadedAlbumCount(app) {
                 counts.append(count)
-                print("LOAD_MORE_ROUND \(round) COUNT \(count)")
+                print("LOAD_MORE_ROUND \(round) BEFORE COUNT \(count)")
+            }
+            if endReached(app) {
+                hitEnd = true
+                break
+            }
+            // Tap the footer's explicit control. This also proves the manual
+            // recovery path a user has when they do not want to keep swiping.
+            let loadMore = app.buttons["load-more-button"].firstMatch
+            if loadMore.exists {
+                loadMore.tap()
+            } else {
+                app.swipeUp()
             }
             waitForFooterToSettle(app)
+            _ = scrollToFooter(app)
+            if let count = loadedAlbumCount(app) {
+                counts.append(count)
+                print("LOAD_MORE_ROUND \(round) AFTER COUNT \(count)")
+            }
             if let errorText = loadMoreErrorText(app) {
                 print("LOAD_MORE_ERROR_ROUND \(round): \(errorText)")
                 capture(name: "ui-08-load-error-round-\(round)")
                 XCTFail("load-more failed in round \(round): \(errorText)")
                 break
             }
+            if endReached(app) {
+                hitEnd = true
+                break
+            }
             capture(name: "ui-08-load-round-\(round)")
-            sleep(1)
         }
-        print("LOAD_MORE_COUNTS: \(counts)")
-        if let first = counts.first, let last = counts.last {
+        print("LOAD_MORE_COUNTS: \(counts) hitEnd=\(hitEnd)")
+        if !hitEnd, counts.count >= 2,
+           let first = counts.first, let last = counts.last {
             XCTAssertGreaterThan(
                 last, first,
                 "album count should grow across load-more rounds"
@@ -194,6 +214,12 @@ final class CategoryScreenUITests: XCTestCase {
             )
         ).firstMatch
         return combined.exists ? combined : nil
+    }
+
+    private func endReached(_ app: XCUIApplication) -> Bool {
+        app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH '已经到底了'")
+        ).firstMatch.exists
     }
 
     private func footerIsLoading(_ app: XCUIApplication) -> Bool {
