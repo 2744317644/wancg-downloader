@@ -140,7 +140,6 @@ public sealed class DownloadService
                     PdfBuilder.BuildFromDirectory(
                         targetDir,
                         pdfPath,
-                        PdfBuilder.DefaultDpi,
                         progress,
                         ct
                     ),

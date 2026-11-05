@@ -1,5 +1,19 @@
 using WnacgDownloader.Core;
 
+if (args.Length >= 3 && args[0].Equals("pdfonly", StringComparison.OrdinalIgnoreCase))
+{
+    var result = PdfBuilder.BuildFromDirectory(
+        args[1],
+        args[2],
+        progress: null,
+        ct: default
+    );
+    Console.WriteLine($"PDF_PAGES={result.Pages}");
+    Console.WriteLine($"PDF_SKIPPED={result.Skipped}");
+    Console.WriteLine($"PDF_BYTES={new FileInfo(args[2]).Length}");
+    return;
+}
+
 var mode = args.FirstOrDefault() ?? "proxy";
 var port = int.Parse(args.ElementAtOrDefault(1) ?? "7890");
 var settings = new AppSettings

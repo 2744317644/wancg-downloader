@@ -11,7 +11,10 @@ namespace WnacgDownloader.Core;
 /// </summary>
 public static class PdfBuilder
 {
-    public const double DefaultDpi = 144;
+    // Every page has the same width (A4 width in points), like the iOS app.
+    // Mixed portrait/landscape pages then line up in PDF viewers instead of
+    // landscape pages appearing wider than portrait ones.
+    public const double PageWidth = 595.0;
 
     private static readonly HashSet<string> ImageExtensions =
         new(StringComparer.OrdinalIgnoreCase)
@@ -22,7 +25,6 @@ public static class PdfBuilder
     public static (int Pages, int Skipped) BuildFromDirectory(
         string directory,
         string outputPath,
-        double dpi = DefaultDpi,
         IProgress<DownloadProgress>? progress = null,
         CancellationToken ct = default
     )
@@ -58,7 +60,7 @@ public static class PdfBuilder
                 1 << 20
             ))
             {
-                var writer = new PdfWriter(stream, Math.Max(dpi, 1));
+                var writer = new PdfWriter(stream);
                 foreach (var file in files)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -206,15 +208,13 @@ public static class PdfBuilder
     private sealed class PdfWriter
     {
         private readonly Stream _stream;
-        private readonly double _dpi;
         private readonly Dictionary<int, long> _offsets = new();
         private readonly List<int> _pageObjects = new();
         private int _nextObject = 3; // 1 = Catalog, 2 = Pages
 
-        public PdfWriter(Stream stream, double dpi)
+        public PdfWriter(Stream stream)
         {
             _stream = stream;
-            _dpi = dpi;
             WriteAscii("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
         }
 
@@ -231,8 +231,8 @@ public static class PdfBuilder
             _nextObject += 3;
             _pageObjects.Add(pageObject);
 
-            var widthPt = Math.Max(1.0, width * 72.0 / _dpi);
-            var heightPt = Math.Max(1.0, height * 72.0 / _dpi);
+            var widthPt = PageWidth;
+            var heightPt = Math.Max(1.0, height * (PageWidth / Math.Max(1, width)));
             var cp = CultureInfo.InvariantCulture;
 
             var imageBody =
