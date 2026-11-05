@@ -1,8 +1,8 @@
-name: UI Preview Screenshots
+name: UI Tests
 
-# Developer preview only: boots the app in an iOS Simulator in CI and captures
-# screenshots of the second-level category screen. The Windows dev box has no
-# Xcode, so this is the only way to see the real rendered UI.
+# Boots the app in an iOS Simulator in CI and runs the XCUITest suites.
+# Screenshots are intentionally NOT uploaded: this repository is public and
+# release artifacts must not contain site imagery. Keep only text logs.
 on:
   push:
     branches:
@@ -95,30 +95,29 @@ jobs:
           echo "ios_version=$IOS_VERSION" >> "$GITHUB_OUTPUT"
           echo "device_name=$DEVICE_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Run UI test and capture screenshots
+      - name: Run UI tests
         working-directory: ios
         run: |
           set -o pipefail
-          xcodebuild test \
-            -project WnacgDownloader.xcodeproj \
-            -scheme WnacgDownloader \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,id=${{ steps.sim.outputs.device_id }}' \
-            -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
+          COMMON=(
+            -project WnacgDownloader.xcodeproj
+            -scheme WnacgDownloader
+            -configuration Debug
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.device_id }}"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=
+            DEVELOPMENT_TEAM=
+          )
+          # Run the two suites in separate xcodebuild sessions: the walkthrough
+          # hits the live site hard, and the following category run used to see
+          # 429s/empty home pages from that traffic.
+          xcodebuild test "${COMMON[@]}" \
+            -only-testing:WnacgDownloaderUITests/CategoryScreenUITests \
+            | tee category-test.log
+          xcodebuild test "${COMMON[@]}" \
+            -only-testing:WnacgDownloaderUITests/AppWalkthroughUITests \
             | tee ui-test.log
-
-      - name: Collect screenshots
-        if: always()
-        working-directory: ios
-        run: |
-          mkdir -p screenshots
-          find "$HOME/Library/Developer/CoreSimulator/Devices" -name 'ui-*.png' \
-            -exec cp {} screenshots/ \; 2>/dev/null || true
-          ls -la screenshots || true
 
       - name: Collect app logs
         if: always()
@@ -139,22 +138,14 @@ jobs:
           path: ios/app.log
           if-no-files-found: ignore
 
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-screenshots
-          path: ios/screenshots
-          if-no-files-found: warn
-
-      - name: Upload test log and result bundle on failure
+      - name: Upload test log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-failure
           path: |
+            ios/category-test.log
             ios/ui-test.log
-            ios/TestResults.xcresult
           if-no-files-found: ignore
 
   legacy-runtime:
@@ -234,36 +225,16 @@ jobs:
             -configuration Debug \
             -destination 'platform=iOS Simulator,id=${{ steps.sim.outputs.device_id }}' \
             -only-testing:WnacgDownloaderUITests/CategoryScreenUITests \
-            -resultBundlePath LegacyTestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             | tee legacy-test.log
 
-      - name: Collect screenshots
-        if: always()
-        working-directory: ios
-        run: |
-          mkdir -p legacy-screenshots
-          find "$HOME/Library/Developer/CoreSimulator/Devices" -name 'ui-*.png' \
-            -exec cp {} legacy-screenshots/ \; 2>/dev/null || true
-          ls -la legacy-screenshots || true
-
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-screenshots-legacy
-          path: ios/legacy-screenshots
-          if-no-files-found: warn
-
-      - name: Upload log and result bundle on failure
+      - name: Upload test log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-failure-legacy
-          path: |
-            ios/legacy-test.log
-            ios/LegacyTestResults.xcresult
+          path: ios/legacy-test.log
           if-no-files-found: ignore

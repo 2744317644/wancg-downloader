@@ -3,23 +3,25 @@
 > 适用对象：在 Windows（无 Xcode / 无 Simulator）机器上开发 iOS App，但需要在**真实 iOS 模拟器**里运行 UI、截图、做回归测试的开发者。
 >
 > 本仓库（`E:\Code\manga-downloader`）就是按这套方案做的：本机 Windows 无法运行 dsh-ios 插件（会返回 `host runs win32`），所以把“跑模拟器”搬到了 GitHub Actions 的 macOS runner 上。
+>
+> **注意：本仓库是 public 仓库，且内容是成人向漫画客户端。为避免把站点画面公开到 GitHub，CI 只上传文本日志与测试结果，不上传任何截图/xcresult；Release 也只附 IPA。** 如果 fork 后想收集截图，请自行改 workflow 并把仓库设为 private，或只在本机查看。
 
 ---
 
 ## 1. 整体方案
 
 ```
-Windows 开发机                          GitHub Actions (macos-15)
+Windows 开发机                          GitHub Actions (macos-26)
 ┌──────────────────┐    git push      ┌────────────────────────────┐
 │ 改代码 / 发版脚本 │ ───────────────▶ │ Xcode 26.3 + iOS Simulator │
 │ gh CLI           │                  │ xcodebuild test (XCUITest) │
-│ gh run download  │ ◀─────────────── │ screenshots / logs / xcresult │
+│ gh run download  │ ◀─────────────── │ text logs only             │
 └──────────────────┘   artifacts      └────────────────────────────┘
 ```
 
 - **代码构建**：`xcodebuild`（Release，未签名 IPA）由 `.github/workflows/ios.yml` 完成。
-- **模拟器 UI 测试与截图**：`.github/workflows/ui-preview.yml`，在 macOS runner 上启动 iOS Simulator，跑 XCUITest，收集截图/无障碍树/系统日志。
-- **发版**：下载 CI 产物 → `gh release create/upload`。
+- **模拟器 UI 测试**：`.github/workflows/ui-preview.yml`，在 macOS runner 上启动 iOS Simulator，跑 XCUITest；只上传文本日志，不上传截图。
+- **发版**：下载 CI 产物 → `gh release create/upload`（只上传 IPA）。
 
 本仓库实际文件：
 
@@ -32,8 +34,8 @@ Windows 开发机                          GitHub Actions (macos-15)
 | `.github/workflows/ios.yml` | Release 编译 + 真实站点 smoke test + IPA 打包 |
 
 优点：
-- 免费（公开仓库）或消耗少量私有仓库额度；
-- 每次结果可复现，截图/日志可下载；
+- public 仓库的标准 runner 免费；private 仓库会消耗 Actions 额度；
+- 每次结果可复现，日志可下载（本仓库不上传截图）；
 - 能同时覆盖最新 iOS 与旧 iOS（本仓库覆盖 iOS 26.2 与 18.x）。
 
 缺点：
@@ -166,7 +168,7 @@ final class AppWalkthroughUITests: XCTestCase {
 `.github/workflows/ui-preview.yml` 核心部分（完整文件见仓库）：
 
 ```yaml
-name: UI Preview Screenshots
+name: UI Tests
 
 on:
   push:
@@ -184,8 +186,8 @@ permissions:
   contents: read
 
 jobs:
-  screenshots:
-    runs-on: macos-15
+  ui-tests:
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -217,30 +219,28 @@ jobs:
           xcrun simctl bootstatus "$DEVICE_ID" -b
           echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Run UI test and capture screenshots
+      - name: Run UI tests
         working-directory: ios
         run: |
           set -o pipefail
-          xcodebuild test \
-            -project WnacgDownloader.xcodeproj \
-            -scheme WnacgDownloader \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,id=${{ steps.sim.outputs.device_id }}' \
-            -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
+          COMMON=(
+            -project WnacgDownloader.xcodeproj
+            -scheme WnacgDownloader
+            -configuration Debug
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.device_id }}"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=
+            DEVELOPMENT_TEAM=
+          )
+          # 两套测试分开跑：walkthrough 会大量访问真实站点，
+          # 紧接其后的分类页测试曾经因此吃到 429 / 空首页。
+          xcodebuild test "${COMMON[@]}" \
+            -only-testing:WnacgDownloaderUITests/CategoryScreenUITests \
+            | tee category-test.log
+          xcodebuild test "${COMMON[@]}" \
+            -only-testing:WnacgDownloaderUITests/AppWalkthroughUITests \
             | tee ui-test.log
-
-      - name: Collect screenshots
-        if: always()
-        working-directory: ios
-        run: |
-          mkdir -p screenshots
-          # 测试把 PNG 写在模拟器容器 temp 里，直接按文件名捞出来
-          find "$HOME/Library/Developer/CoreSimulator/Devices" -name 'ui-*.png' \
-            -exec cp {} screenshots/ \; 2>/dev/null || true
 
       - name: Collect app logs
         if: always()
@@ -254,21 +254,21 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-screenshots
-          path: ios/screenshots
+          name: app-log
+          path: ios/app.log
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: ui-test-failure
           path: |
+            ios/category-test.log
             ios/ui-test.log
-            ios/TestResults.xcresult
 ```
 
 注意：
-- `-resultBundlePath` 会生成 `.xcresult`，失败时上传，用 Xcode 的 `xcresulttool` 或 Mac 的 Xcode 打开分析。
-- `if: always()` 确保测试失败也上传截图/日志。
+- **不生成/上传截图与 `.xcresult`**：public 仓库不适合公开站点画面；失败时只上传文本日志。
+- 需要截图时，在 `private` fork 或本机加回 XCTAttachment / `xcresult`。
 - `permissions: contents: read` 足够；无需签名，`CODE_SIGNING_ALLOWED=NO` 即可在模拟器运行。
 
 ---
@@ -354,17 +354,19 @@ gh run view <run-id> -R 2744317644/wancg-downloader --log > ui.log
 - `SCREENSHOT_PATH: ...`
 - 测试里 `print(app.debugDescription)` 输出的无障碍树。
 
-### 4.3 下载截图 / 日志
+### 4.3 下载日志
 
 ```powershell
+# 应用侧日志
 gh run download <run-id> -R 2744317644/wancg-downloader `
-  -n ui-screenshots -D .\artifacts\ui
+  -n app-log -D .\artifacts\logs
 
+# 测试失败时的日志
 gh run download <run-id> -R 2744317644/wancg-downloader `
   -n ui-test-failure -D .\artifacts\failure
 ```
 
-（`ui-screenshots` / `ui-test-failure` 是 workflow 里 `upload-artifact` 的 name；本仓库另有 `app-log`。）
+> 本仓库是 public 且有成人向内容，**CI 不生成/上传截图与 `.xcresult`**，只保留文本日志；截图策略见 §7.5。
 
 ### 4.4 无障碍树怎么看
 
@@ -409,9 +411,10 @@ gh release create v1.23.0 -R 2744317644/wancg-downloader `
   --title "v1.23.0 - ..." `
   --notes-file .\release-notes-1.23.0.md `
   --latest `
-  ".\artifacts\ipa\WnacgDownloader-unsigned.ipa" `
-  ".\docs\screenshots\home.png"
+  ".\artifacts\ipa\WnacgDownloader-unsigned.ipa"
 ```
+
+> 本仓库的 Release **只上传 IPA，不附截图**（如图片必须保留，请改用 private 仓库）。
 
 > 如果 `gh release create` 报 `tag_name is not a valid tag` 且你传的是短 commit SHA，改用 `--target main`（或完整 40 位 SHA）。
 
@@ -424,7 +427,7 @@ gh release create v1.23.0 -R 2744317644/wancg-downloader `
 | 编译 iOS App | ❌（无 Xcode） | ✅ |
 | 启动 iOS Simulator | ❌ | ✅ |
 | 交互式点按/输入 | ❌（dsh-ios 返回 host runs win32） | ⚠️ 只能通过 XCUITest 脚本 |
-| 截图 | ❌ | ✅（XCUITest + simctl） |
+| 截图 | ❌ | ⚠️ 测试内可截图，但本仓库 CI/Release 不上传 |
 | 崩溃/系统日志 | ❌ | ✅（`simctl spawn log show`） |
 | Instruments 性能分析 | ❌ | ⚠️ 可跑但结果需 Mac 阅读/导出 |
 
@@ -464,13 +467,15 @@ git push origin main
 
 - 每个网络等待都给 `waitForExistence(timeout:)`（30–120s），不要全 `sleep`；
 - job `timeout-minutes: 40`；
-- 多个测试共用一次 `xcodebuild test`，总时长 = 各 test 之和；本仓库两个测试约 4–6 分钟（含构建）。
+- 本仓库把 `CategoryScreenUITests` 与 `AppWalkthroughUITests` 分成两次 `xcodebuild test` 跑（避免 walkthrough 的站点流量导致后面分类页 429）；总时长约 6–9 分钟。
 
-### 7.5 截图拿不到
+### 7.5 截图策略（本仓库不上传截图）
 
-- 测试和 workflow 必须用同一文件名前缀（本仓库 `ui-*.png`）；
-- 截图要写到 `FileManager.default.temporaryDirectory`（模拟器应用容器内），workflow 用 `find ~/Library/Developer/CoreSimulator/Devices -name 'ui-*.png'` 收集；
-- 记得 `if: always()` 上传，失败也能拿到现场图。
+- 因为仓库 public 且内容是成人向漫画客户端，**不在 GitHub 上存储任何站点截图**：
+  - Release 只附 IPA；
+  - Actions 只上传文本日志（`app-log`、`ui-test-failure`），不上传截图或 `.xcresult`；
+- 本机（Mac）可用 dsh-ios / `xcrun simctl io screenshot` 截图查看；
+- 若确实需要 CI 截图，请把仓库设为 private，或在 fork 里自行加回 `actions/upload-artifact` 并承担公开风险。
 
 ### 7.6 编码 / 中文
 
@@ -487,11 +492,11 @@ git push origin main
 ## 8. 最小落地清单
 
 - [ ] `project.yml` 增加 `bundle.ui-testing` target + scheme test 配置
-- [ ] `ios/UITests/*.swift`：截图写 temp + 打印路径 + dump 无障碍树
-- [ ] workflow：选择最新/最旧 iOS runtime（§3）、`xcodebuild test`、收集截图/日志、上传 artifacts
+- [ ] `ios/UITests/*.swift`：断言行为 + dump 无障碍树（截图仅写本机临时目录，不上传）
+- [ ] workflow：选择最新/最旧 iOS runtime（§3）、`xcodebuild test`、上传文本日志
 - [ ] push main 的 `ios/**` 自动触发 + 支持 `workflow_dispatch`
-- [ ] 失败时仍上传截图与 `.xcresult`
-- [ ] Windows 侧用 `gh run download` 取图 + `gh release create` 发版
+- [ ] 失败时仍上传测试日志（不含截图/xcresult）
+- [ ] Windows 侧用 `gh run download` 取日志 + `gh release create` 发版（只传 IPA）
 - [ ] 需要旧系统覆盖时加 `legacy-runtime` job（`-only-testing:` 只跑核心回归）
 
 ---
