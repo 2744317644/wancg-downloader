@@ -256,7 +256,7 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack(alignment: .top) {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -325,7 +325,7 @@ struct ReaderView: View {
                     }
                 }
 
-                readerChrome(topInset: geometry.safeAreaInsets.top)
+                readerChrome()
                     .opacity(chromeHidden ? 0 : 1)
                     .allowsHitTesting(!chromeHidden)
                     .animation(.easeInOut(duration: 0.2), value: chromeHidden)
@@ -370,7 +370,7 @@ struct ReaderView: View {
 
     /// Custom chrome floating over the artwork. It lives in a ZStack sibling
     /// layer, so its visibility has zero effect on the scroll layout.
-    private func readerChrome(topInset: CGFloat) -> some View {
+    private func readerChrome() -> some View {
         HStack(spacing: 10) {
             Button {
                 dismiss()
@@ -409,8 +409,10 @@ struct ReaderView: View {
             .accessibilityLabel("重新加载")
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 14)
-        .padding(.top, max(topInset, 12) + 6)
+        // Hug the top edge: the status bar is hidden and the buttons sit in
+        // the two corners, clear of the Dynamic Island and rounded corners.
+        .padding(.horizontal, 24)
+        .padding(.top, 10)
     }
 
     private func chromeCircle(_ systemName: String) -> some View {
