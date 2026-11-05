@@ -53,6 +53,12 @@ public sealed class SettingsPage : Page
         IsChecked = true,
     };
 
+    private readonly CheckBox _pdfBox = new()
+    {
+        Content = "下载完成后生成 PDF（每页一张原图）",
+        IsChecked = true,
+    };
+
     private readonly InfoBar _info = Ui.Info();
 
     public SettingsPage()
@@ -113,6 +119,7 @@ public sealed class SettingsPage : Page
         concurrencyRow.Children.Add(_concurrencyBox);
         perfStack.Children.Add(concurrencyRow);
         perfStack.Children.Add(_zipBox);
+        perfStack.Children.Add(_pdfBox);
         stack.Children.Add(Ui.Card(perfStack));
 
         var save = Ui.AccentButton("保存设置");
@@ -145,6 +152,7 @@ public sealed class SettingsPage : Page
         _dohBox.Text = settings.DohEndpoint;
         _concurrencyBox.Value = settings.ImageConcurrency;
         _zipBox.IsChecked = settings.CreateZip;
+        _pdfBox.IsChecked = settings.CreatePdf;
         UpdateNetworkControls();
     }
 
@@ -208,6 +216,7 @@ public sealed class SettingsPage : Page
                     : _dohBox.Text.Trim(),
                 ImageConcurrency = (int)Math.Clamp(_concurrencyBox.Value, 1, 12),
                 CreateZip = _zipBox.IsChecked == true,
+                CreatePdf = _pdfBox.IsChecked == true,
             };
             AppServices.Instance.SaveSettings(settings);
             _dirBox.Text = directory;

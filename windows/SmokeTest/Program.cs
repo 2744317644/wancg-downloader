@@ -60,6 +60,21 @@ if (args.Contains("download"))
     );
     Console.WriteLine($"DOWNLOADED={folder}");
     Console.WriteLine($"FILES={Directory.GetFiles(folder).Length}");
+
+    var pdf = Path.Combine(
+        Path.GetDirectoryName(folder)!,
+        Path.GetFileName(folder) + ".pdf"
+    );
+    if (File.Exists(pdf))
+    {
+        Console.WriteLine($"PDF_BYTES={new FileInfo(pdf).Length}");
+        Console.WriteLine($"PDF_PAGES={PdfBuilder.CountPages(pdf)}");
+        Console.WriteLine($"PDF_VALID={PdfBuilder.LooksLikeValidPdf(pdf)}");
+    }
+    else
+    {
+        Console.WriteLine("PDF_MISSING");
+    }
 }
 
 Console.WriteLine("SMOKE_OK");

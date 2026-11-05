@@ -129,6 +129,31 @@ public sealed class DownloadService
             );
         }
 
+        if (settings.CreatePdf)
+        {
+            var pdfPath = Path.Combine(baseDir, folderName + ".pdf");
+            progress?.Report(
+                new DownloadProgress(total, total, Interlocked.Read(ref bytes), "正在生成 PDF…")
+            );
+            var pdf = await Task.Run(
+                () =>
+                    PdfBuilder.BuildFromDirectory(
+                        targetDir,
+                        pdfPath,
+                        PdfBuilder.DefaultDpi,
+                        progress,
+                        ct
+                    ),
+                ct
+            );
+            var note = pdf.Skipped > 0
+                ? $"PDF 完成（{pdf.Pages} 页，跳过 {pdf.Skipped} 张非 JPEG）"
+                : $"PDF 完成（{pdf.Pages} 页）";
+            progress?.Report(
+                new DownloadProgress(total, total, Interlocked.Read(ref bytes), note)
+            );
+        }
+
         progress?.Report(
             new DownloadProgress(total, total, Interlocked.Read(ref bytes), "下载完成")
         );

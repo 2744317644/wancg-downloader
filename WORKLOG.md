@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-11-06（第十轮：Windows 客户端补上 PDF 输出）
+
+- `windows/WnacgDownloader/Core/PdfBuilder.cs`：极简 PDF 1.4 写入器，每页一张全幅图片；JPEG 直接 `DCTDecode` 嵌入，不重编码；
+- `AppSettings.CreatePdf`（默认 true），设置页新增「下载完成后生成 PDF」；
+- `DownloadService` 在图片下载 / ZIP 打包后生成 `<作品名>.pdf`，进度写入下载队列；
+- `SmokeTest` 增加 PDF 结构/页数校验；新增 `windows/PdfCheck` 用 `Windows.Data.Pdf` 渲染首屏验证；
+- 实测 197 页作品：PDF 104 MB / 197 页 / 结构有效 / 首屏渲染正确；
+- 版本 1.0.1，发布 win-v1.0.1（zip，无截图）。
+
+---
+
 ## 2026-11-06（第九轮：Windows WinUI 3 原生客户端）
 
 ### 新增 `windows/`

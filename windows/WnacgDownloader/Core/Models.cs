@@ -30,6 +30,8 @@ public sealed class AppSettings
     public int ImageConcurrency { get; set; } = 4;
 
     public bool CreateZip { get; set; } = true;
+
+    public bool CreatePdf { get; set; } = true;
 }
 
 public sealed class AlbumPreview
