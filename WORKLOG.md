@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-11-06（第十二轮：iOS 阅读器按钮与灵动岛齐平）
+
+- 阅读器悬浮按钮（关闭/页数/刷新）之前虽然上移到顶部两角，但仍在安全区下方，视觉比灵动岛低；
+- `readerChrome()` 加 `.ignoresSafeArea(edges: .top)`，top padding 10 / 水平 24；
+- XCUITest 实测 iPhone 17 Pro（402×874pt）：关闭按钮 `x=23.75, y=9.75, 40.5×40.5`，与灵动岛同一行；
+- UI 测试新增断言 `frame.minY < 24` 防回归；
+- iOS 26.2 全流程 + iOS 18.x 分类回归均通过；
+- **v1.24.4（build 266）**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.24.4>（仅 IPA）。
+
+---
+
 ## 2026-11-06（第十一轮：Windows PDF 横竖页排版与 iOS 对齐）
 
 - 原 Windows PDF 每页宽度 = 图片宽 × 72/144，横版页和竖版页宽度不同，阅读器里横版会显得更宽；
