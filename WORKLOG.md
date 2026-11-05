@@ -32,7 +32,9 @@
 
 ### 发布
 
-- IPA 已验证 **1.24.2 / build 264**；UI 测试重跑通过后创建 release。
+- IPA 已验证 **1.24.2 / build 264**，Release **只附 IPA、不含截图**；
+- UI 测试重跑通过：iOS 26.2 完整全流程 + iOS 18.x 分类页回归；
+- **v1.24.2**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.24.2>
 
 ---
 
