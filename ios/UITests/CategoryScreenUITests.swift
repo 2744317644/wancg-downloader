@@ -123,6 +123,12 @@ final class CategoryScreenUITests: XCTestCase {
                     let closeReader = app.buttons["reader-close-button"].firstMatch
                     if closeReader.waitForExistence(timeout: 60) {
                         sleep(6)
+                        let frame = closeReader.frame
+                        print(
+                            "READER_CLOSE_FRAME: x=\(frame.minX) " +
+                            "y=\(frame.minY) w=\(frame.width) h=\(frame.height) " +
+                            "screen=\(app.windows.firstMatch.frame)"
+                        )
                         capture(name: "ui-10-reader")
                         closeReader.tap()
                         sleep(2)

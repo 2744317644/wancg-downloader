@@ -326,6 +326,10 @@ struct ReaderView: View {
                 }
 
                 readerChrome()
+                    // Let the floating buttons sit in the status-bar area so
+                    // they line up vertically with the Dynamic Island instead
+                    // of starting below the safe area.
+                    .ignoresSafeArea(edges: .top)
                     .opacity(chromeHidden ? 0 : 1)
                     .allowsHitTesting(!chromeHidden)
                     .animation(.easeInOut(duration: 0.2), value: chromeHidden)
