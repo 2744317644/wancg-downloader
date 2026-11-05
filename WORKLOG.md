@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-11-05（第八轮：阅读器操作按钮上移到顶部两角）
+
+- 用户截图指出关闭（×）/ 页数（23P）/ 刷新三个悬浮按钮位置偏低，压在第一格漫画/对白上；
+- `readerChrome()` 去掉 `safeAreaInsets` 计算，改为 `padding(.top, 10)` + `padding(.horizontal, 24)`，贴合屏幕顶部两角，避开灵动岛与圆角；
+- 单击切换沉浸、左缘右滑返回、滚动进度 HUD、右缘页码条保持不变；
+- 验证：iOS 26.2 全流程 UI + iOS 18.x 分类回归通过；Release 编译 + smoke test 通过；
+- **v1.24.3（build 265）**：<https://github.com/2744317644/wancg-downloader/releases/tag/v1.24.3>（仅 IPA，无截图）。
+
+---
+
 ## 2026-11-05（第七轮：public 化解决 Actions 额度 + 清理 GitHub 截图 + 阅读器沉浸修复）
 
 ### Actions 额度
