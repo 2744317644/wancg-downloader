@@ -413,10 +413,11 @@ struct ReaderView: View {
             .accessibilityLabel("重新加载")
         }
         .frame(maxWidth: .infinity)
-        // Hug the top edge: the status bar is hidden and the buttons sit in
-        // the two corners, clear of the Dynamic Island and rounded corners.
+        // The top edge of the buttons aligns with the bottom edge of the
+        // Dynamic Island (island bottom is ~48pt on modern iPhones).
+        // Horizontal padding keeps the buttons clear of the rounded corners.
         .padding(.horizontal, 24)
-        .padding(.top, 10)
+        .padding(.top, 48)
     }
 
     private func chromeCircle(_ systemName: String) -> some View {

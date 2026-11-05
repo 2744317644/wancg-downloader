@@ -129,11 +129,15 @@ final class CategoryScreenUITests: XCTestCase {
                             "y=\(frame.minY) w=\(frame.width) h=\(frame.height) " +
                             "screen=\(app.windows.firstMatch.frame)"
                         )
-                        // The floating chrome must sit in the Dynamic Island
-                        // row, not below the top safe area.
+                        // The buttons' top edge must line up with the bottom
+                        // of the Dynamic Island (not inside it or above it).
+                        XCTAssertGreaterThan(
+                            frame.minY, 30,
+                            "reader chrome should start below the Dynamic Island"
+                        )
                         XCTAssertLessThan(
-                            frame.minY, 24,
-                            "reader chrome should align with the Dynamic Island"
+                            frame.minY, 60,
+                            "reader chrome should align with the Dynamic Island bottom"
                         )
                         capture(name: "ui-10-reader")
                         closeReader.tap()
