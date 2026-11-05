@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-11-06（第十三轮：PDF 页缝 + Windows 安装包/图标/双页预览）
+
+### PDF 页间黑色间隙
+
+- 用 `Windows.Data.Pdf` 逐页渲染确认：PDF 每页图片是铺满页面的，没有页内黑边；
+- 黑缝来自 **App 内 PDF 阅读器**：PDFKit 深色背景 + 默认分页间隙/页面阴影；
+- iOS `FilesView` PDF 阅读器设置：
+  - `displaysPageBreaks = false`
+  - `pageBreakMargins = .zero`
+  - `pageShadowsEnabled = false`
+  - 页面首尾相接，深色背景不再从页缝露出；
+- 外部阅读器（Edge/Adobe/系统预览）的页间空隙是阅读器自己的分页背景，不属于 PDF 内容；要完全无缝只能做长图 PDF。
+
+### Windows
+
+- **安装包**：Inno Setup 6 脚本 `windows/installer/wnacg.iss`，按用户安装到 `%LOCALAPPDATA%\Programs\wnacg`，开始菜单/可选桌面图标、卸载器；Setup 约 59 MB；
+- **图标同步**：由 iOS `AppIcon` 1024px 用 Pillow 生成多尺寸 `Assets/app.ico`，设为 exe 图标、窗口图标、安装器和快捷方式图标；
+- **预览重做**：单页/双页模式，页面自动适配窗口高度；点击左右半屏或「上一页/下一页」切页；缓存最近 10 页 + 预取相邻页；
+- 版本 1.0.3；发布 win-v1.0.3（Setup + 便携 zip，无截图）。
+
+### 验证
+
+- Windows 安装包静默安装成功，安装后的 exe 正常启动，开始菜单快捷方式存在；
+- UI 自动化截图验证双页/单页/切页布局（本地，不上传）；
+- iOS PDF 阅读器改动编译通过；版本 1.24.5。
+
+---
+
 ## 2026-11-06（第十二轮：iOS 阅读器按钮与灵动岛齐平）
 
 - 阅读器悬浮按钮（关闭/页数/刷新）之前虽然上移到顶部两角，但仍在安全区下方，视觉比灵动岛低；
