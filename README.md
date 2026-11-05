@@ -1,4 +1,4 @@
-# wnacg 漫画下载器（Windows Web UI + iOS 原生 App）
+# wnacg 漫画下载器（Windows WinUI 3 / Web UI + iOS App）
 
 这个仓库包含两套实现：
 
