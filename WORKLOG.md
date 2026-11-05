@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-11-05（第七轮：public 化解决 Actions 额度 + 清理 GitHub 截图 + 阅读器沉浸修复）
+
+### Actions 额度
+
+- private 仓库的 Actions 分钟数用尽，macOS job 排队约 15 分钟后被取消；
+- 按 GitHub 计费文档，**public 仓库的标准 GitHub-hosted runner 免费**，已把仓库转为 public（`2744317644/wancg-downloader`）；
+- runner 从 `macos-15` 切到 `macos-26`（该镜像含 Xcode 26.3），恢复后构建/UI 测试正常启动。
+
+### 清理 GitHub 上的截图（public 合规）
+
+- 删除 v1.21.0–v1.24.1 共 **33 个**截图类 release assets；
+- 从 v1.21.0–v1.21.4 共 **5 个** release 说明中移除内嵌图片 markdown；
+- 删除 **41 个**包含截图/xcresult 的 Actions artifacts；
+- `ui-preview.yml` 不再收集/上传截图与 `.xcresult`，只上传文本日志；Release 从现在起只附 IPA。
+
+### v1.24.2 阅读器修复
+
+- 沉浸切换导致画面上移：根因是隐藏导航栏/状态栏改变了 ScrollView 的 safe area；
+- 改为**全屏内容 + 悬浮 chrome**（关闭/页数/刷新悬浮在图片上），状态栏/导航栏常驻隐藏，切换只改 opacity，画面不再移动；
+- 保留左缘右滑返回、滚动进度 HUD、右缘页码条。
+
+### 测试调整
+
+- walkthrough 通过后，同一次 `xcodebuild test` 里的分类页测试因站点 429 没拿到「同人志」chip（历史审计也提示过这个串扰）；
+- 改为两套独立 `xcodebuild test` 会话、分类页先跑；失败日志分别上传。
+
+### 发布
+
+- IPA 已验证 **1.24.2 / build 264**；UI 测试重跑通过后创建 release。
+
+---
+
 ## 2026-11-04（第六轮：详情页背景优化 + 阅读器左缘返回手势）
 
 ### 详情页背景返工
