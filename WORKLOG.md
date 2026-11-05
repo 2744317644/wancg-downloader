@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-11-06（第十五轮：最低 iOS 26 + Liquid Glass 阅读器）
+
+### 最低系统版本
+
+- App / Widget / UITests 的 deployment target 从 iOS 17 提升到 **iOS 26.0**；
+- 低于 iOS 26 无法安装，不再做旧系统适配；
+- CI 删除 `legacy-runtime`（最旧 iOS 18.x）job，只跑最新 iOS 26 runtime；README 与模拟器指南同步更新。
+
+### 阅读器 Liquid Glass
+
+- 顶部关闭 / 页数 / 刷新三个按钮改为 iOS 26 原生 Liquid Glass：
+  - 外层 `GlassEffectContainer`；
+  - 按钮 `.glassEffect(.regular.interactive(), in: Circle())`；
+  - 页数胶囊 `.glassEffect(.regular, in: Capsule())`；
+- 底部滚动页数进度胶囊（「0% · 共 23P」）同样换成 Liquid Glass；
+- 按钮位置保持与灵动岛底部齐平。
+
+### 测试细节
+
+- Liquid Glass 后 XCUITest 暴露的是按钮内图标 glyph（12.3×12.3, y≈62），不是 40pt 玻璃圆的外框；
+- 断言改为 glyph y 在 50–80（对应玻璃圆顶部≈48），CI 全流程 + 分类回归通过；
+- **v1.25.0（build 269）**，仅最新 iOS 26.2 runtime 验证。
+
+---
+
 ## 2026-11-06（第十四轮：iOS 阅读器按钮顶部对齐灵动岛底部）
 
 - 上一版按钮顶部对齐灵动岛顶部，位置偏高；改为顶部 padding 48pt，让按钮**顶部与灵动岛底部持平**；
