@@ -8,18 +8,32 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $project = Join-Path $root "WnacgDownloader\WnacgDownloader.csproj"
 
-$dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue)?.Source
-if (-not $dotnet) {
-    $candidates = @(
-        (Join-Path $env:USERPROFILE ".dotnet\dotnet.exe"),
-        "E:\Tools\dotnet8\dotnet.exe",
-        "C:\Program Files\dotnet\dotnet.exe"
-    )
-    $dotnet = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+function Test-DotnetSdk([string]$path) {
+    if (-not (Test-Path $path)) { return $false }
+    try {
+        $sdks = & $path --list-sdks 2>$null
+        return ($sdks -join "`n") -match "(^|\n)\d+\."
+    } catch {
+        return $false
+    }
 }
+
+$candidates = @()
+$command = Get-Command dotnet -ErrorAction SilentlyContinue
+if ($command) { $candidates += $command.Source }
+$candidates += @(
+    (Join-Path $env:USERPROFILE ".dotnet\dotnet.exe"),
+    "E:\Tools\dotnet8\dotnet.exe",
+    "C:\Program Files\dotnet\dotnet.exe"
+)
+$dotnet = $candidates |
+    Where-Object { $_ -and (Test-DotnetSdk $_) } |
+    Select-Object -First 1
 if (-not $dotnet) {
-    throw "找不到 dotnet。请先安装 .NET 8 SDK：https://dotnet.microsoft.com/download/dotnet/8.0"
+    throw "找不到带 SDK 的 dotnet。请先安装 .NET 8 SDK：https://dotnet.microsoft.com/download/dotnet/8.0"
 }
+
+Write-Host "dotnet: $dotnet"
 
 if (-not $Publish) {
     & $dotnet build $project -c $Configuration -p:Platform=x64
