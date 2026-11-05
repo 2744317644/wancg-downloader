@@ -365,6 +365,12 @@ private struct PDFKitView: UIViewRepresentable {
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
         view.backgroundColor = UIColor(red: 0.04, green: 0.06, blue: 0.10, alpha: 1)
+        // Remove the dark page-break gap between PDF pages. The generated
+        // PDFs have edge-to-edge pages, so the gap was PDFKit's page-break
+        // background, not part of the file.
+        view.displaysPageBreaks = false
+        view.pageBreakMargins = .zero
+        view.pageShadowsEnabled = false
         view.document = document
         context.coordinator.observe(view)
         context.coordinator.pdfView = view

@@ -17,6 +17,18 @@ public sealed class MainWindow : Window
         Title = "wnacg 下载器";
         try
         {
+            var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+            if (File.Exists(icon))
+            {
+                AppWindow.SetIcon(icon);
+            }
+        }
+        catch
+        {
+            // A custom title-bar icon is cosmetic.
+        }
+        try
+        {
             AppWindow.Resize(new Windows.Graphics.SizeInt32(1400, 950));
         }
         catch
