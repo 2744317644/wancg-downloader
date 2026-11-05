@@ -322,6 +322,15 @@ struct ReaderView: View {
                             pageCount: model.pageURLs.count
                         )
                         .padding(.bottom, 24)
+                        // Hide the bottom page counter together with the top
+                        // chrome; it is already only a transient scroll HUD.
+                        .opacity(chromeHidden ? 0 : 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(chromeHidden)
+                        .animation(
+                            .easeInOut(duration: 0.2),
+                            value: chromeHidden
+                        )
                     }
                 }
 
