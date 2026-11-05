@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-11-06（第九轮：Windows WinUI 3 原生客户端）
+
+### 新增 `windows/`
+
+- 新项目 `windows/WnacgDownloader`：.NET 8 + Windows App SDK 1.8（WinUI 3），**unpackaged + self-contained**，解压运行 `WnacgDownloader.exe`；
+- 功能：
+  - 链接解析 → 封面/标题/页数/标签 → 预览 / 下载；
+  - 浏览器书签 HTML / 链接列表导入 → 多选批量下载；
+  - 软件内漫画滚动预览（并发加载）；
+  - 设置：下载目录（FolderPicker）、系统代理 / 自定义 `127.0.0.1:端口` / DoH 直连、图片并发、ZIP 打包；
+  - 下载队列：进度/速度、取消、打开文件夹。
+
+### 核心实现
+
+- `WnacgClient`：`SocketsHttpHandler` 三模式（系统代理 / 自定义代理端口 / DoH ConnectCallback）；正则解析移植自 iOS/Python；
+- `DohResolver`：Cloudflare + AliDNS/DoH.pub 回退，TLS + SNI 校验 IP 后缓存 10 分钟；
+- `DownloadService`：并发下载阅读页图片 → 文件夹 + `info.txt` + 可选 ZIP；
+- `SmokeTest` 控制台：代理与 DoH 两种模式都验证了解析、197 个图片地址、首图；代理模式额外完整下载 197 页并打包 ZIP。
+
+### 踩坑
+
+- Windows App SDK 的 `Frame.Navigate` 在本机 Windows 10 上直接 `0xC0000005` 崩溃（页面构造前），改为 `NavigationView.Content` 直接切换页面；
+- 125% DPI 下窗口初始尺寸偏小，`AppWindow.Resize(1400,950)` 并在 UI 自动化中等待窗口稳定；
+- 用 PowerShell 写含中文的 JSON 时曾被终端编码搞坏路径，改用 `Environment.GetFolderPath` 构造。
+
+### 构建/验证
+
+- `dotnet publish` 产出 328 个文件 / 约 215 MB，zip 约 85 MB；发布版 exe 启动正常；
+- UI 自动化截图验证（本地，不上传）：下载页、解析结果、预览、书签、设置；下载队列显示 39/197 进度；
+- 发布：**win-v1.0.0**（zip 附在 GitHub Release，不含截图）。
+
+---
+
 ## 2026-11-05（第八轮：阅读器操作按钮上移到顶部两角）
 
 - 用户截图指出关闭（×）/ 页数（23P）/ 刷新三个悬浮按钮位置偏低，压在第一格漫画/对白上；

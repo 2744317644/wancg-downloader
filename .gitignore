@@ -33,3 +33,9 @@ push_favorites.py
 job.log
 tree.json
 docs/screenshots/
+
+# Windows WinUI 3 build artifacts
+windows/**/bin/
+windows/**/obj/
+windows/dist/
+windows/*.png

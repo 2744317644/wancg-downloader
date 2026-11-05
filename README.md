@@ -131,6 +131,20 @@ open WnacgDownloader.xcodeproj
 
 ---
 
+## Windows 桌面版（WinUI 3）
+
+`windows/` 下是新的 WinUI 3 原生客户端（.NET 8 + Windows App SDK），免安装 exe，解压即用：
+
+- **链接下载**：解析作品页/阅读页，展示封面、标题、页数、标签，可先预览再下载；
+- **书签下载**：导入 Chrome/Edge/Firefox 导出的书签 HTML（或 `.txt` 链接列表），勾选后批量下载；
+- **漫画预览**：软件内滚动预览，图片按并发数加载；
+- **设置**：下载目录选择、系统代理 / 自定义代理端口 / DoH 直连、图片并发数、下载后打包 ZIP；
+- 下载队列显示进度、速度，可取消，完成后可直接打开文件夹。
+
+使用与构建说明见 **[windows/README.md](windows/README.md)**；快速构建发布：`windows/build.ps1 -Publish`。
+
+---
+
 ## Windows Web UI
 
 双击 **`启动下载.bat`**，会自动启动本地服务并打开网页。在网页里粘贴作品链接，右侧会显示封面和详情预览，任务区实时显示：
