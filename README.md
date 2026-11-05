@@ -10,6 +10,8 @@
 
 源码在 [`ios/`](ios/)，构建流程在 [`.github/workflows/ios.yml`](.github/workflows/ios.yml)。
 
+> **系统要求：iOS 26.0+**。从 1.25.0 起最低部署版本为 iOS 26，低于 iOS 26 的设备无法安装，也不再做兼容适配。
+
 **直接下载 unsigned IPA：** [最新 Release](https://github.com/2744317644/wancg-downloader/releases/latest)
 
 > App 图标使用站点 Logo（看板娘 + 紳士漫畫字标）制作。
@@ -79,7 +81,8 @@
   iOS 26 自动获得液态玻璃外观，并固定为常驻不收起（`tabBarMinimizeBehavior(.never)`）；
 - **外观**：在“设置 → 外观”可切换“跟随系统 / 浅色 / 深色”，浅色模式会同步调整首页、分类、
   详情和下载页的背景与文字；
-- 旧系统（iOS 17–25）使用标准系统页签，不会崩溃。
+- 阅读器顶部「关闭 / 页数 / 刷新」和底部页数进度胶囊使用 **iOS 26 Liquid Glass**；
+- **不再支持 iOS 26 以下系统**（最低部署版本 26.0）。
 
 ### 实现说明
 

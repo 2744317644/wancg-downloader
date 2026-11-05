@@ -375,44 +375,43 @@ struct ReaderView: View {
     /// Custom chrome floating over the artwork. It lives in a ZStack sibling
     /// layer, so its visibility has zero effect on the scroll layout.
     private func readerChrome() -> some View {
-        HStack(spacing: 10) {
-            Button {
-                dismiss()
-            } label: {
-                chromeCircle("xmark")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("reader-close-button")
-            .accessibilityLabel("关闭阅读")
+        // iOS 26 Liquid Glass: group the chrome pieces so their glass shapes
+        // share the native container behaviour.
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 10) {
+                Button {
+                    dismiss()
+                } label: {
+                    chromeCircle("xmark")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("reader-close-button")
+                .accessibilityLabel("关闭阅读")
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            if !model.pageURLs.isEmpty {
-                Text("\(model.pageURLs.count)P")
-                    .font(.caption.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule().stroke(
-                            Color.white.opacity(0.16), lineWidth: 0.5
-                        )
-                    )
-            }
+                if !model.pageURLs.isEmpty {
+                    Text("\(model.pageURLs.count)P")
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular, in: Capsule())
+                }
 
-            Button {
-                Task { await model.reload() }
-            } label: {
-                chromeCircle("arrow.clockwise")
-                    .opacity(model.isLoading ? 0.45 : 1)
+                Button {
+                    Task { await model.reload() }
+                } label: {
+                    chromeCircle("arrow.clockwise")
+                        .opacity(model.isLoading ? 0.45 : 1)
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isLoading)
+                .accessibilityLabel("重新加载")
             }
-            .buttonStyle(.plain)
-            .disabled(model.isLoading)
-            .accessibilityLabel("重新加载")
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
         // The top edge of the buttons aligns with the bottom edge of the
         // Dynamic Island (island bottom is ~48pt on modern iPhones).
         // Horizontal padding keeps the buttons clear of the rounded corners.
@@ -425,10 +424,7 @@ struct ReaderView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
             .frame(width: 40, height: 40)
-            .background(.ultraThinMaterial, in: Circle())
-            .overlay(
-                Circle().stroke(Color.white.opacity(0.16), lineWidth: 0.5)
-            )
+            .glassEffect(.regular.interactive(), in: Circle())
     }
 }
 
@@ -451,12 +447,9 @@ private struct ReaderProgressHUD: View {
             .font(.caption.weight(.semibold))
             .monospacedDigit()
             .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(
-                Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.5)
-            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
             .opacity(visible ? 1 : 0)
             .animation(.easeInOut(duration: 0.2), value: visible)
             .allowsHitTesting(false)

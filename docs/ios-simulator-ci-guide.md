@@ -27,7 +27,7 @@ Windows 开发机                          GitHub Actions (macos-26)
 
 | 文件 | 作用 |
 | --- | --- |
-| `.github/workflows/ui-preview.yml` | 启动模拟器、跑两个 UI 测试 job（最新 iOS + 最旧 iOS） |
+| `.github/workflows/ui-preview.yml` | 启动最新 iOS 模拟器、跑 UI 测试（iOS 26 最低部署，无需旧系统 job） |
 | `ios/project.yml` | 声明 `WnacgDownloaderUITests` target 和 test scheme |
 | `ios/UITests/CategoryScreenUITests.swift` | 分类页自动化回归（自动加载/筛选/详情/阅读器） |
 | `ios/UITests/AppWalkthroughUITests.swift` | 全 App 走查（各 tab、深浅色、搜索、解析） |
@@ -61,7 +61,7 @@ targets:
   WnacgDownloaderUITests:
     type: bundle.ui-testing
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - path: UITests
     dependencies:
@@ -311,20 +311,11 @@ PY
 
 用输出中的 udid 作为 `-destination 'platform=iOS Simulator,id=<udid>'`。
 
-### 3.2 选最旧 iOS（兼容性 job）
+### 3.2 旧 iOS runtime（本仓库已不再需要）
 
-同一脚本把 `reverse=True` 改成 `False`，用于验证部署目标（本仓库 iOS 17）的兼容性。本仓库 `legacy-runtime` job 在最旧 iOS（当前 18.x）上只跑分类页回归：
+本仓库自 **1.25.0** 起最低部署版本为 **iOS 26**（低于 26 无法安装），因此只跑最新 iOS runtime，`ui-preview.yml` 里原来的 `legacy-runtime` job 已移除。
 
-```bash
-xcodebuild test \
-  -project WnacgDownloader.xcodeproj \
-  -scheme WnacgDownloader \
-  -destination 'platform=iOS Simulator,id=<old-udid>' \
-  -only-testing:WnacgDownloaderUITests/CategoryScreenUITests \
-  ...
-```
-
-这样最新系统跑完整走查，旧系统跑核心回归，兼顾覆盖与耗时。
+如果其他项目仍需兼容旧系统，可以保留类似 job：把升序脚本（`reverse=False`）选出的最旧 runtime 作为 destination，用 `-only-testing:` 只跑核心回归，并把 deployment target 相应降低。
 
 ---
 
@@ -493,11 +484,11 @@ git push origin main
 
 - [ ] `project.yml` 增加 `bundle.ui-testing` target + scheme test 配置
 - [ ] `ios/UITests/*.swift`：断言行为 + dump 无障碍树（截图仅写本机临时目录，不上传）
-- [ ] workflow：选择最新/最旧 iOS runtime（§3）、`xcodebuild test`、上传文本日志
+- [ ] workflow：选择最新 iOS runtime（§3）、`xcodebuild test`、上传文本日志
 - [ ] push main 的 `ios/**` 自动触发 + 支持 `workflow_dispatch`
 - [ ] 失败时仍上传测试日志（不含截图/xcresult）
 - [ ] Windows 侧用 `gh run download` 取日志 + `gh release create` 发版（只传 IPA）
-- [ ] 需要旧系统覆盖时加 `legacy-runtime` job（`-only-testing:` 只跑核心回归）
+- [ ] 需要旧系统覆盖时再加回 `legacy-runtime` job（本仓库 iOS 26+，已移除）
 
 ---
 
