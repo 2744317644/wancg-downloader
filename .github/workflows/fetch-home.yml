@@ -11,21 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Download home page
+      - name: Download home page (desktop + iPhone UA)
         run: |
-          curl -sSL --retry 3 --retry-delay 2 --max-time 90 \
-            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" \
-            https://www.wnacg.com/ -o home.html
-          ls -lh home.html
-          grep -o '最新上架' home.html | wc -l
-          grep -o '單行本' home.html | wc -l
-          grep -o 'class="imgBox"' home.html | wc -l
-          grep -o 'class="Title"' home.html | wc -l
-          grep -o 'class="txtA"' home.html | wc -l
+          UA_DESKTOP="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          UA_IPHONE="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+          curl -sSL --retry 3 --retry-delay 2 --max-time 90 -A "$UA_DESKTOP" https://www.wnacg.com/ -o home-desktop.html
+          curl -sSL --retry 3 --retry-delay 2 --max-time 90 -A "$UA_IPHONE" https://www.wnacg.com/ -o home-iphone.html
+          for f in home-desktop.html home-iphone.html; do
+            echo "=== $f ==="
+            ls -lh "$f"
+            grep -o '最新上架' "$f" | wc -l
+            grep -o '最新更新' "$f" | wc -l
+            grep -o '單行本' "$f" | wc -l
+            grep -o 'class="imgBox"' "$f" | wc -l
+            grep -o 'class="Title"' "$f" | wc -l
+            grep -o 'class="txtA"' "$f" | wc -l
+            grep -o 'class="li gallary_item"' "$f" | wc -l
+            grep -o 'class="title_h2"' "$f" | wc -l
+          done
 
       - name: Upload HTML
         uses: actions/upload-artifact@v4
         with:
           name: wnacg-home-html
-          path: home.html
+          path: |
+            home-desktop.html
+            home-iphone.html
           retention-days: 1
