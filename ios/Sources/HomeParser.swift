@@ -54,6 +54,7 @@ enum HomeParser {
         )
         var sections: [HomeSection] = []
         var seenTitles = Set<String>()
+        let hiddenTitles: Set<String> = ["最新上架", "最新更新"]
 
         for block in blocks {
             guard let title = HTMLParser.first(
@@ -61,6 +62,8 @@ enum HomeParser {
             ).map(HTMLParser.clean), !title.isEmpty else {
                 continue
             }
+            // The homepage's "latest additions" rail is hidden in the app.
+            guard !hiddenTitles.contains(title) else { continue }
             guard seenTitles.insert(title).inserted else { continue }
 
             let albums = parseCards(block)
@@ -97,12 +100,16 @@ enum HomeParser {
             }
             guard !seen.contains(aid) else { continue }
 
+            // Some sections use `class="txtA hei"` (single-volume cards),
+            // so the class match must accept extra class names. If the title
+            // link is absent, use the cover alt text — never the info span,
+            // which contains "2026-11-07, 24張圖片".
             let title = HTMLParser.first(
-                "<a class=\"txtA\"[^>]*>(.*?)</a>", in: card
+                "<a class=\"txtA[^\"]*\"[^>]*>(.*?)</a>", in: card
             ).map(HTMLParser.clean) ?? ""
             let fallbackTitle = title.isEmpty
                 ? HTMLParser.first(
-                    "<a class=\"ImgA[^\"]*\"[^>]*>.*?<span[^>]*>(.*?)</span>",
+                    "<img[^>]+alt=\"([^\"]+)\"",
                     in: card
                 ).map(HTMLParser.clean) ?? ""
                 : title
