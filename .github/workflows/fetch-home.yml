@@ -1,0 +1,31 @@
+name: Fetch Wnacg Home
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download home page
+        run: |
+          curl -sSL --retry 3 --retry-delay 2 --max-time 90 \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" \
+            https://www.wnacg.com/ -o home.html
+          ls -lh home.html
+          grep -o '最新上架' home.html | wc -l
+          grep -o '單行本' home.html | wc -l
+          grep -o 'class="imgBox"' home.html | wc -l
+          grep -o 'class="Title"' home.html | wc -l
+          grep -o 'class="txtA"' home.html | wc -l
+
+      - name: Upload HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: wnacg-home-html
+          path: home.html
+          retention-days: 1
