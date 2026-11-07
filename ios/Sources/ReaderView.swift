@@ -384,56 +384,62 @@ struct ReaderView: View {
     /// Custom chrome floating over the artwork. It lives in a ZStack sibling
     /// layer, so its visibility has zero effect on the scroll layout.
     private func readerChrome() -> some View {
-        // iOS 26 Liquid Glass: group the chrome pieces so their glass shapes
-        // share the native container behaviour.
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 10) {
-                Button {
-                    dismiss()
-                } label: {
-                    chromeCircle("xmark")
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("reader-close-button")
-                .accessibilityLabel("关闭阅读")
-
-                Spacer(minLength: 0)
-
-                if !model.pageURLs.isEmpty {
-                    Text("\(model.pageURLs.count)P")
-                        .font(.caption.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .glassEffect(.regular, in: Capsule())
-                }
-
-                Button {
-                    Task { await model.reload() }
-                } label: {
-                    chromeCircle("arrow.clockwise")
-                        .opacity(model.isLoading ? 0.45 : 1)
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isLoading)
-                .accessibilityLabel("重新加载")
+        // Apply Liquid Glass per control instead of wrapping everything in a
+        // GlassEffectContainer: the container's interactive hit testing could
+        // swallow taps meant for the close button.
+        HStack(spacing: 10) {
+            Button {
+                dismiss()
+            } label: {
+                chromeCircle("xmark")
             }
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
+            .contentShape(Circle())
+            .accessibilityIdentifier("reader-close-button")
+            .accessibilityLabel("关闭阅读")
+
+            Spacer(minLength: 0)
+
+            if !model.pageURLs.isEmpty {
+                Text("\(model.pageURLs.count)P")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .contentShape(Capsule())
+                    .glassEffect(.regular, in: Capsule())
+            }
+
+            Button {
+                Task { await model.reload() }
+            } label: {
+                chromeCircle("arrow.clockwise")
+                    .opacity(model.isLoading ? 0.45 : 1)
+            }
+            .buttonStyle(.plain)
+            .contentShape(Circle())
+            .disabled(model.isLoading)
+            .accessibilityLabel("重新加载")
         }
+        .frame(maxWidth: .infinity)
         // The top edge of the buttons aligns with the bottom edge of the
         // Dynamic Island (island bottom is ~48pt on modern iPhones).
         // Horizontal padding keeps the buttons clear of the rounded corners.
         .padding(.horizontal, 24)
         .padding(.top, 48)
+        .zIndex(2)
     }
 
     private func chromeCircle(_ systemName: String) -> some View {
         Image(systemName: systemName)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
-            .frame(width: 40, height: 40)
-            .glassEffect(.regular.interactive(), in: Circle())
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            // Non-interactive glass: the enclosing Button owns the tap, so a
+            // real finger tap always reaches the Button action.
+            .glassEffect(.regular, in: Circle())
     }
 }
 
