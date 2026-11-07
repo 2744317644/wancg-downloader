@@ -129,16 +129,16 @@ final class CategoryScreenUITests: XCTestCase {
                             "y=\(frame.minY) w=\(frame.width) h=\(frame.height) " +
                             "screen=\(app.windows.firstMatch.frame)"
                         )
-                        // With Liquid Glass, XCUITest exposes the icon glyph
-                        // inside the 40pt glass circle, so the glyph's y is
-                        // about 14pt below the glass circle's top edge.
-                        // Correct placement: circle top ~48pt, glyph ~62pt.
-                        XCTAssertGreaterThan(
-                            frame.minY, 50,
+                        // The close button now exposes its full 44pt hit
+                        // frame (not just the glass icon glyph), so its top
+                        // edge should line up with the Dynamic Island bottom
+                        // at about 48pt.
+                        XCTAssertGreaterThanOrEqual(
+                            frame.minY, 44,
                             "reader chrome should start below the Dynamic Island"
                         )
                         XCTAssertLessThan(
-                            frame.minY, 80,
+                            frame.minY, 60,
                             "reader chrome should align with the Dynamic Island bottom"
                         )
                         capture(name: "ui-10-reader")
