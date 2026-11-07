@@ -1,0 +1,28 @@
+name: Fetch Wnacg Search
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download search page
+        run: |
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+          URL="https://www.wnacg.com/search/index.php?q=Flugel&m=&syn=yes&f=_all&s=create_time_DESC"
+          curl -sSL --retry 3 --retry-delay 2 --max-time 90 -A "$UA" "$URL" -o search.html
+          ls -lh search.html
+          grep -o 'photos-index-aid-' search.html | wc -l
+          grep -o 'class="txtA' search.html | wc -l
+          grep -o 'class="imgBox"' search.html | wc -l
+      - name: Upload search HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: wnacg-search-html
+          path: search.html
+          retention-days: 1
