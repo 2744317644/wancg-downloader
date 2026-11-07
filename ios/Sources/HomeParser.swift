@@ -107,12 +107,20 @@ enum HomeParser {
             let title = HTMLParser.first(
                 "<a class=\"txtA[^\"]*\"[^>]*>(.*?)</a>", in: card
             ).map(HTMLParser.clean) ?? ""
-            let fallbackTitle = title.isEmpty
+            var fallbackTitle = title.isEmpty
                 ? HTMLParser.first(
-                    "<img[^>]+alt=\"([^\"]+)\"",
+                    "<a class=\"ImgA[^\"]*\"[^>]*>.*?<span[^>]*>(.*?)</span>",
                     in: card
                 ).map(HTMLParser.clean) ?? ""
                 : title
+            if fallbackTitle.isEmpty {
+                // Last resort for cards where the title only exists as the
+                // cover image's alt text.
+                fallbackTitle = HTMLParser.first(
+                    "<img[^>]+alt=\"([^\"]+)\"",
+                    in: card
+                ).map(HTMLParser.clean) ?? ""
+            }
             if fallbackTitle.isEmpty { continue }
             let displayTitle = fallbackTitle
 
