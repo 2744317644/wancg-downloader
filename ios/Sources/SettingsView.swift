@@ -16,6 +16,8 @@ struct SettingsView: View {
     @AppStorage("performance.coverConcurrency") private var coverConcurrency = 3
     @AppStorage("performance.readerConcurrency") private var readerConcurrency = 2
     @AppStorage("content.hideAI") private var hideAI = false
+    @AppStorage(TagExclusionStore.storageKey) private var excludedTagsRaw = ""
+    @State private var showExcludeTags = false
     @AppStorage("debug.showFPS") private var showFPS = false
 
     var body: some View {
@@ -98,10 +100,26 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("屏蔽 AI 图集", isOn: $hideAI)
+                    Button {
+                        showExcludeTags = true
+                    } label: {
+                        HStack {
+                            Label("排除标签", systemImage: "tag.slash")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(excludedTags.count)")
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("内容")
                 } footer: {
-                    Text("开启后首页、分类和搜索会隐藏标题中带 AI 标记的作品；收藏和历史不受影响。")
+                    Text(
+                        "屏蔽 AI 与排除标签会应用到首页、分类、搜索和标签搜索结果；"
+                        + "排除标签按标题中的标签/关键词匹配。收藏和历史不受影响。"
+                    )
                 }
 
                 Section {
@@ -137,6 +155,13 @@ struct SettingsView: View {
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()
+            .sheet(isPresented: $showExcludeTags) {
+                TagExclusionSheet(rawTags: $excludedTagsRaw)
+            }
         }
+    }
+
+    private var excludedTags: [String] {
+        TagExclusionStore.list(from: excludedTagsRaw)
     }
 }

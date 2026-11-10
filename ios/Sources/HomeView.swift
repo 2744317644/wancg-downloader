@@ -268,6 +268,7 @@ struct HomeView: View {
     @State private var searchQuery = ""
     @State private var showSearch = false
     @AppStorage("content.hideAI") private var hideAI = false
+    @AppStorage(TagExclusionStore.storageKey) private var excludedTagsRaw = ""
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -326,8 +327,7 @@ struct HomeView: View {
                    let url = HomeParser.searchURL(searchQuery) {
                     CategoryView(
                         title: "搜索：\(searchQuery)",
-                        startURL: url,
-                        appliesLanguageFilter: false
+                        startURL: url
                     )
                 }
             }
@@ -358,9 +358,13 @@ struct HomeView: View {
     }
 
     private var displaySections: [HomeSection] {
-        guard hideAI else { return model.sections }
+        let excluded = TagExclusionStore.list(from: excludedTagsRaw)
+        guard hideAI || !excluded.isEmpty else { return model.sections }
         return model.sections.compactMap { section in
-            let albums = section.albums.filter { !$0.isAI }
+            let albums = section.albums.filter {
+                (!hideAI || !$0.isAI)
+                    && !TagExclusionStore.matches($0.title, excluded: excluded)
+            }
             guard !albums.isEmpty else { return nil }
             return HomeSection(
                 title: section.title,

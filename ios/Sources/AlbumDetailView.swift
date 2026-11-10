@@ -46,6 +46,7 @@ struct AlbumDetailView: View {
     @State private var tagsExpanded = false
     @State private var backdropImage: UIImage?
     @AppStorage("content.hideAI") private var hideAI = false
+    @AppStorage(TagExclusionStore.storageKey) private var excludedTagsRaw = ""
     @StateObject private var model: AlbumDetailModel
 
     init(album: HomeAlbum) {
@@ -358,6 +359,13 @@ struct AlbumDetailView: View {
         }
     }
 
+    private func excludeTag(_ tag: String) {
+        var tags = TagExclusionStore.list(from: excludedTagsRaw)
+        guard !TagExclusionStore.contains(tag, in: tags) else { return }
+        tags.append(tag)
+        excludedTagsRaw = TagExclusionStore.serialize(tags)
+    }
+
     private func tagChip(_ tag: String) -> some View {
         Text(tag)
             .font(.caption2)
@@ -386,10 +394,24 @@ struct AlbumDetailView: View {
                             )
                         } label: {
                             tagChip(tag)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        excludeTag(tag)
+                                    } label: {
+                                        Label("排除此标签", systemImage: "tag.slash")
+                                    }
+                                }
                         }
                         .buttonStyle(.plain)
                     } else {
                         tagChip(tag)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    excludeTag(tag)
+                                } label: {
+                                    Label("排除此标签", systemImage: "tag.slash")
+                                }
+                            }
                     }
                 }
             }

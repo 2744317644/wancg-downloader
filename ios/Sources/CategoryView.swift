@@ -22,6 +22,7 @@ final class CategoryFeedModel: ObservableObject {
     private var loadedAids = Set<String>()
     private var filterLanguage: MangaLanguageFilter = .all
     private var filterHideAI = false
+    private var filterExcludedTags: [String] = []
     private var lastLoadFinishedAt: Date?
     private var recoveryTask: Task<Void, Never>?
     private var recoveryAttempts = 0
@@ -54,10 +55,20 @@ final class CategoryFeedModel: ObservableObject {
         await load(reset: false)
     }
 
-    func setFilters(language: MangaLanguageFilter, hideAI: Bool) {
-        guard language != filterLanguage || hideAI != filterHideAI else { return }
+    func setFilters(
+        language: MangaLanguageFilter,
+        hideAI: Bool,
+        excludedTags: [String]
+    ) {
+        let normalizedTags = TagExclusionStore.list(
+            from: excludedTags.joined(separator: "\n")
+        )
+        guard language != filterLanguage
+                || hideAI != filterHideAI
+                || normalizedTags != filterExcludedTags else { return }
         filterLanguage = language
         filterHideAI = hideAI
+        filterExcludedTags = normalizedTags
         recomputeVisibleAlbums()
     }
 
@@ -68,6 +79,11 @@ final class CategoryFeedModel: ObservableObject {
         }
         if filterHideAI {
             result = result.filter { !$0.isAI }
+        }
+        if !filterExcludedTags.isEmpty {
+            result = result.filter {
+                !TagExclusionStore.matches($0.title, excluded: filterExcludedTags)
+            }
         }
         visibleAlbums = result
     }
@@ -207,6 +223,8 @@ struct CategoryView: View {
     @AppStorage("manga.languageFilter")
     private var languageFilter = MangaLanguageFilter.all.rawValue
     @AppStorage("content.hideAI") private var hideAI = false
+    @AppStorage(TagExclusionStore.storageKey) private var excludedTagsRaw = ""
+    @State private var showExcludeSheet = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -284,6 +302,12 @@ struct CategoryView: View {
             }
             .onChange(of: hideAI) { _, _ in
                 handleFilterChange(proxy: proxy)
+            }
+            .onChange(of: excludedTagsRaw) { _, _ in
+                handleFilterChange(proxy: proxy)
+            }
+            .sheet(isPresented: $showExcludeSheet) {
+                TagExclusionSheet(rawTags: $excludedTagsRaw)
             }
             .task {
                 syncModelFilters()
@@ -400,6 +424,7 @@ struct CategoryView: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                     languageFilter = MangaLanguageFilter.all.rawValue
                     hideAI = false
+                    excludedTagsRaw = ""
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.mint)
@@ -572,6 +597,7 @@ struct CategoryView: View {
                     }
                 }
                 aiPill
+                excludeTagsPill
             }
             .padding(.vertical, 2)
         }
@@ -605,6 +631,34 @@ struct CategoryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var excludeTagsPill: some View {
+        let count = excludedTags.count
+        let active = count > 0
+        return Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            showExcludeSheet = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: active ? "tag.slash.fill" : "tag.slash")
+                    .font(.system(size: 9, weight: .bold))
+                Text(active ? "排除 \(count)" : "排除标签")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(active ? Color.black : Color.primary.opacity(0.82))
+            .padding(.horizontal, 13)
+            .padding(.vertical, 8)
+            .background(
+                active ? Color.mint : Color.primary.opacity(0.06),
+                in: Capsule()
+            )
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityLabel(active ? "排除标签，已排除 \(count) 个" : "排除标签")
     }
 
     private var aiPill: some View {
@@ -643,7 +697,15 @@ struct CategoryView: View {
     }
 
     private func syncModelFilters() {
-        model.setFilters(language: selectedLanguage, hideAI: hideAI)
+        model.setFilters(
+            language: selectedLanguage,
+            hideAI: hideAI,
+            excludedTags: excludedTags
+        )
+    }
+
+    private var excludedTags: [String] {
+        TagExclusionStore.list(from: excludedTagsRaw)
     }
 
     private func scrollToTop(proxy: ScrollViewProxy) {
