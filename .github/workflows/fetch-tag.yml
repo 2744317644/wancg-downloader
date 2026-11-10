@@ -1,0 +1,27 @@
+name: Fetch Wnacg Tag
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download tag page
+        run: |
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+          curl -sSL --retry 3 --retry-delay 2 --max-time 90 -A "$UA" "https://www.wnacg.com/albums-index-tag-NTR.html" -o tag.html
+          ls -lh tag.html
+          grep -o 'photos-index-aid-' tag.html | wc -l
+          grep -o 'class="txtA' tag.html | wc -l
+          grep -o 'class="thispage".\{0,200\}' tag.html | head -3
+      - name: Upload HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: wnacg-tag-html
+          path: tag.html
+          retention-days: 1
