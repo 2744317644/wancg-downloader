@@ -423,11 +423,12 @@ struct AlbumDetailView: View {
                 spacing: 8
             ) {
                 ForEach(displayedTags, id: \.self) { tag in
-                    if let searchURL = HomeParser.searchURL(tag) {
+                    if let tagURL = HomeParser.tagURL(tag)
+                        ?? HomeParser.searchURL(tag) {
                         NavigationLink {
                             CategoryView(
                                 title: "标签：\(tag)",
-                                startURL: searchURL
+                                startURL: tagURL
                             )
                         } label: {
                             tagChip(tag)

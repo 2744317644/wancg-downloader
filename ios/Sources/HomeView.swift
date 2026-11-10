@@ -269,6 +269,7 @@ struct HomeView: View {
     @State private var showSearch = false
     @AppStorage("content.hideAI") private var hideAI = false
     @AppStorage(TagExclusionStore.storageKey) private var excludedTagsRaw = ""
+    @State private var tagIndexVersion = 0
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 10),
@@ -346,8 +347,28 @@ struct HomeView: View {
             }
             .task {
                 await model.load()
+                await refreshTagCoverage()
+            }
+            .onChange(of: excludedTagsRaw) { _, _ in
+                Task { await refreshTagCoverage() }
             }
         }
+    }
+
+    private func refreshTagCoverage() async {
+        let excluded = TagExclusionStore.list(from: excludedTagsRaw)
+        guard !excluded.isEmpty else {
+            tagIndexVersion += 1
+            return
+        }
+        let dates = model.sections
+            .flatMap(\.albums)
+            .compactMap { $0.date.isEmpty ? nil : $0.date }
+        await ExcludedTagIndex.shared.ensureCoverage(
+            tags: excluded,
+            through: dates.min() ?? ""
+        )
+        tagIndexVersion += 1
     }
 
     private func submitSearch() {
@@ -358,12 +379,16 @@ struct HomeView: View {
     }
 
     private var displaySections: [HomeSection] {
+        _ = tagIndexVersion
         let excluded = TagExclusionStore.list(from: excludedTagsRaw)
         guard hideAI || !excluded.isEmpty else { return model.sections }
         return model.sections.compactMap { section in
             let albums = section.albums.filter {
                 (!hideAI || !$0.isAI)
-                    && !TagExclusionStore.matches($0.title, excluded: excluded)
+                    && !ExcludedTagIndex.shared.isExcluded(
+                        album: $0,
+                        tags: excluded
+                    )
             }
             guard !albums.isEmpty else { return nil }
             return HomeSection(

@@ -82,10 +82,25 @@ final class CategoryFeedModel: ObservableObject {
         }
         if !filterExcludedTags.isEmpty {
             result = result.filter {
-                !TagExclusionStore.matches($0.title, excluded: filterExcludedTags)
+                !ExcludedTagIndex.shared.isExcluded(
+                    album: $0,
+                    tags: filterExcludedTags
+                )
             }
         }
         visibleAlbums = result
+    }
+
+    /// Make sure the excluded-tag index covers the currently loaded albums
+    /// before filtering, then recompute the visible set.
+    func ensureExcludedTagCoverage() async {
+        guard !filterExcludedTags.isEmpty else { return }
+        let oldest = albums.compactMap { $0.date.isEmpty ? nil : $0.date }.min()
+        await ExcludedTagIndex.shared.ensureCoverage(
+            tags: filterExcludedTags,
+            through: oldest ?? ""
+        )
+        recomputeVisibleAlbums()
     }
 
     private func throttleIfNeeded() async {
@@ -168,6 +183,17 @@ final class CategoryFeedModel: ObservableObject {
 
             didLoadOnce = true
             recoveryAttempts = 0
+
+            if !filterExcludedTags.isEmpty {
+                let dates = (reset ? parsed : albums + parsed)
+                    .compactMap { $0.date.isEmpty ? nil : $0.date }
+                await ExcludedTagIndex.shared.ensureCoverage(
+                    tags: filterExcludedTags,
+                    through: dates.min() ?? ""
+                )
+                guard token == generation else { return }
+            }
+
             recomputeVisibleAlbums()
         } catch let err {
             guard token == generation else { return }
@@ -691,6 +717,7 @@ struct CategoryView: View {
     private func handleFilterChange(proxy: ScrollViewProxy) {
         syncModelFilters()
         Task { @MainActor in
+            await model.ensureExcludedTagCoverage()
             await fillFilteredPages(limit: 6)
             scrollToTop(proxy: proxy)
         }

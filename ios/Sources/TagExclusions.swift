@@ -23,6 +23,10 @@ enum TagExclusionStore {
         list(from: tags.joined(separator: "\n")).joined(separator: "\n")
     }
 
+    static func key(_ tag: String) -> String {
+        normalized(tag)
+    }
+
     static func contains(_ tag: String, in list: [String]) -> Bool {
         let key = normalized(tag)
         return list.contains { normalized($0) == key }

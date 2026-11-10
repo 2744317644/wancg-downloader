@@ -28,7 +28,7 @@ struct TagExclusionSheet: View {
                             .disabled(trimmedInput.isEmpty)
                     }
                 } footer: {
-                    Text("例如 NTR、触手、AI。列表页会隐藏标题中包含这些标签/关键词的作品。")
+                    Text("例如 NTR、触手、AI。列表会按站点标签页精确排除；索引尚未覆盖时按标题关键词回退。")
                 }
 
                 Section("已排除的标签") {

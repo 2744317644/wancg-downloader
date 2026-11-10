@@ -226,6 +226,17 @@ enum HomeParser {
         return nil
     }
 
+    static func tagURL(_ tag: String) -> URL? {
+        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/?#")
+        guard let encoded = trimmed.addingPercentEncoding(
+            withAllowedCharacters: allowed
+        ) else { return nil }
+        return URL(string: "https://www.wnacg.com/albums-index-tag-\(encoded).html")
+    }
+
     static func searchURL(_ query: String) -> URL? {
         var components = URLComponents(
             string: "https://www.wnacg.com/search/index.php"
