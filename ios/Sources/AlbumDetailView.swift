@@ -41,6 +41,7 @@ struct AlbumDetailView: View {
     @EnvironmentObject private var history: HistoryStore
     @State private var showAlreadyDownloaded = false
     @State private var didCopyTitle = false
+    @State private var copiedTag: String?
     @State private var downloadStartedHere = false
     @State private var showReader = false
     @State private var tagsExpanded = false
@@ -107,6 +108,20 @@ struct AlbumDetailView: View {
             .padding(16)
         }
         .background(background)
+        .overlay(alignment: .bottom) {
+            if let copiedTag {
+                Text("已复制：\(copiedTag)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .glassEffect(.regular, in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: copiedTag)
         .navigationTitle("详情")
         .navigationBarTitleDisplayMode(.inline)
         .seamlessNavigationBar()
@@ -199,14 +214,10 @@ struct AlbumDetailView: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(4)
+                        // Keep native text selection: a contextMenu here used
+                        // to swallow the long-press, so users could not select
+                        // and copy only part of the title.
                         .textSelection(.enabled)
-                        .contextMenu {
-                            Button {
-                                copyTitle()
-                            } label: {
-                                Label("复制标题", systemImage: "doc.on.doc")
-                            }
-                        }
 
                     Button {
                         copyTitle()
@@ -359,6 +370,32 @@ struct AlbumDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func tagMenu(_ tag: String) -> some View {
+        Button {
+            copyTag(tag)
+        } label: {
+            Label("复制标签", systemImage: "doc.on.doc")
+        }
+        Button(role: .destructive) {
+            excludeTag(tag)
+        } label: {
+            Label("排除此标签", systemImage: "tag.slash")
+        }
+    }
+
+    private func copyTag(_ tag: String) {
+        UIPasteboard.general.string = tag
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        copiedTag = tag
+        Task {
+            try? await Task.sleep(for: .seconds(1.4))
+            if copiedTag == tag {
+                copiedTag = nil
+            }
+        }
+    }
+
     private func excludeTag(_ tag: String) {
         var tags = TagExclusionStore.list(from: excludedTagsRaw)
         guard !TagExclusionStore.contains(tag, in: tags) else { return }
@@ -394,24 +431,12 @@ struct AlbumDetailView: View {
                             )
                         } label: {
                             tagChip(tag)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        excludeTag(tag)
-                                    } label: {
-                                        Label("排除此标签", systemImage: "tag.slash")
-                                    }
-                                }
+                                .contextMenu { tagMenu(tag) }
                         }
                         .buttonStyle(.plain)
                     } else {
                         tagChip(tag)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    excludeTag(tag)
-                                } label: {
-                                    Label("排除此标签", systemImage: "tag.slash")
-                                }
-                            }
+                            .contextMenu { tagMenu(tag) }
                     }
                 }
             }
