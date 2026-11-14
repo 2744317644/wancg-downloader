@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 
 namespace WnacgDownloader.Core;
 
+public sealed record BookmarkParseResult(List<BookmarkItem> Items, int RawLinks);
+
 public static class BookmarkParser
 {
     private static readonly Regex AidRegex = new(
@@ -14,6 +16,17 @@ public static class BookmarkParser
     {
         var text = File.ReadAllText(path);
         return ParseText(text);
+    }
+
+    /// <summary>
+    /// Parse a bookmark export and keep the raw link count so the UI can
+    /// explain why the number of downloadable works is lower after
+    /// de-duplication.
+    /// </summary>
+    public static BookmarkParseResult ParseFileWithStats(string path)
+    {
+        var text = File.ReadAllText(path);
+        return new BookmarkParseResult(ParseText(text), AidRegex.Matches(text).Count);
     }
 
     public static List<BookmarkItem> ParseText(string text)

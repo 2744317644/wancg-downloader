@@ -28,6 +28,7 @@ public sealed class BookmarksPage : Page
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100 };
     private readonly Button _downloadSelected = Ui.AccentButton("下载选中");
     private readonly Button _downloadAll = new() { Content = "下载全部" };
+    private readonly Button _selectAll = new() { Content = "全选" };
     private readonly Button _cancel = new() { Content = "停止", IsEnabled = false };
 
     private List<BookmarkItem> _items = new();
@@ -57,12 +58,11 @@ public sealed class BookmarksPage : Page
         };
         var importFile = Ui.AccentButton("导入书签文件");
         importFile.Click += async (_, _) => await ImportFileAsync();
-        var selectAll = new Button { Content = "全选" };
-        selectAll.Click += (_, _) => _list.SelectAll();
+        _selectAll.Click += (_, _) => ToggleSelectAll();
         var clear = new Button { Content = "清空" };
         clear.Click += (_, _) => ApplyItems(new List<BookmarkItem>());
         importRow.Children.Add(importFile);
-        importRow.Children.Add(selectAll);
+        importRow.Children.Add(_selectAll);
         importRow.Children.Add(clear);
         stack.Children.Add(Ui.Card(importRow));
 
@@ -101,6 +101,7 @@ public sealed class BookmarksPage : Page
         stack.Children.Add(_status);
         stack.Children.Add(_info);
         stack.Children.Add(_list);
+        _list.SelectionChanged += (_, _) => UpdateSelectionStatus();
 
         scroll.Content = stack;
         Content = scroll;
@@ -132,14 +133,19 @@ public sealed class BookmarksPage : Page
                 return;
             }
 
-            var items = BookmarkParser.ParseFile(file.Path);
-            ApplyItems(items);
+            var result = BookmarkParser.ParseFileWithStats(file.Path);
+            ApplyItems(result.Items);
+            var duplicateCount = Math.Max(0, result.RawLinks - result.Items.Count);
             Ui.ShowInfo(
                 _info,
-                items.Count > 0
-                    ? $"从 {file.Name} 解析到 {items.Count} 个作品。"
+                result.Items.Count > 0
+                    ? duplicateCount > 0
+                        ? $"从 {file.Name} 找到 {result.RawLinks} 条作品链接，去重后 {result.Items.Count} 个作品（{duplicateCount} 条重复）。"
+                        : $"从 {file.Name} 解析到 {result.Items.Count} 个作品。"
                     : "文件里没有找到 wnacg 作品链接。",
-                items.Count > 0 ? InfoBarSeverity.Success : InfoBarSeverity.Warning
+                result.Items.Count > 0
+                    ? InfoBarSeverity.Success
+                    : InfoBarSeverity.Warning
             );
         }
         catch (Exception ex)
@@ -189,9 +195,51 @@ public sealed class BookmarksPage : Page
         }
 
         _list.ItemsSource = displays;
-        _status.Text =
-            items.Count == 0 ? "尚未导入书签。" : $"共 {items.Count} 个作品，勾选后下载。";
+        _selectAll.Content = "全选";
+        UpdateSelectionStatus();
         UpdateButtons();
+    }
+
+    /// <summary>
+    /// Do not rely on ListView.SelectAll(): with a virtualized list it can
+    /// leave items unselected. Adding each item to SelectedItems is reliable
+    /// and also gives us a visible selected count.
+    /// </summary>
+    private void ToggleSelectAll()
+    {
+        if (_items.Count == 0)
+        {
+            return;
+        }
+
+        var allSelected = _list.SelectedItems.Count == _list.Items.Count;
+        _list.SelectedItems.Clear();
+        if (!allSelected)
+        {
+            foreach (var item in _list.Items)
+            {
+                _list.SelectedItems.Add(item);
+            }
+        }
+
+        UpdateSelectionStatus();
+    }
+
+    private void UpdateSelectionStatus()
+    {
+        if (_items.Count == 0)
+        {
+            _status.Text = "尚未导入书签。";
+            _selectAll.Content = "全选";
+            return;
+        }
+
+        var selected = _list.SelectedItems.Count;
+        _status.Text =
+            selected > 0
+                ? $"共 {_items.Count} 个作品，已选 {selected} 个；可直接点「下载选中」或「下载全部」。"
+                : $"共 {_items.Count} 个作品，勾选后下载，或直接点「下载全部」。";
+        _selectAll.Content = selected == _items.Count ? "取消全选" : "全选";
     }
 
     private void UpdateButtons()

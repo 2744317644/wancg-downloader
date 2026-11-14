@@ -1,10 +1,10 @@
 ; wnacg 下载器 Windows installer (Inno Setup 6)
-; Build: ISCC.exe /DMyAppVersion=1.0.3 wnacg.iss
+; Build: ISCC.exe /DMyAppVersion=1.0.4 wnacg.iss
 ; Expects the published app in ..\dist\WnacgDownloader-win-x64\
 
 #define MyAppName "wnacg 下载器"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.3"
+  #define MyAppVersion "1.0.4"
 #endif
 #define MyAppPublisher "wnacg"
 #define MyAppExeName "WnacgDownloader.exe"
