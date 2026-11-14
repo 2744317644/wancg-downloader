@@ -19,7 +19,7 @@ Windows 端原生客户端，.NET 8 + Windows App SDK 1.8（WinUI 3），**免�
 
 ### 安装版（推荐）
 
-1. 运行 `WnacgDownloader-Setup-1.0.4.exe`；
+1. 运行 `WnacgDownloader-Setup-1.0.5.exe`；
 2. 按向导安装（按用户安装，不需要管理员权限），会创建开始菜单快捷方式，可选桌面图标；
 3. 从开始菜单启动 `wnacg 下载器`；在「设置 → 应用」里可卸载。
 

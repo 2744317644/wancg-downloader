@@ -67,9 +67,15 @@ public sealed class SettingsPage : Page
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Padding = new Thickness(24),
         };
-        var stack = new StackPanel { Spacing = 14 };
+        var stack = new StackPanel
+        {
+            Spacing = 14,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
         stack.Children.Add(Ui.Heading("设置"));
         stack.Children.Add(
             Ui.Secondary(

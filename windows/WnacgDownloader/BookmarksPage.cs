@@ -11,9 +11,11 @@ public sealed class BookmarksPage : Page
     private readonly ListView _list = new()
     {
         SelectionMode = ListViewSelectionMode.Multiple,
-        Height = 280,
+        Height = 220,
         HorizontalAlignment = HorizontalAlignment.Stretch,
     };
+
+    private readonly StackPanel _queueHost = new() { Spacing = 8 };
 
     private readonly TextBox _pasteBox = new()
     {
@@ -41,9 +43,15 @@ public sealed class BookmarksPage : Page
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Padding = new Thickness(24),
         };
-        var stack = new StackPanel { Spacing = 14 };
+        var stack = new StackPanel
+        {
+            Spacing = 14,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
         stack.Children.Add(Ui.Heading("书签下载"));
         stack.Children.Add(
             Ui.Secondary(
@@ -66,13 +74,11 @@ public sealed class BookmarksPage : Page
         importRow.Children.Add(clear);
         stack.Children.Add(Ui.Card(importRow));
 
-        var pasteCard = new StackPanel { Spacing = 8 };
-        pasteCard.Children.Add(Ui.Text("粘贴链接", 14, bold: true));
-        pasteCard.Children.Add(_pasteBox);
-        var addPasted = new Button { Content = "添加到列表" };
-        addPasted.Click += (_, _) => AddPastedLinks();
-        pasteCard.Children.Add(addPasted);
-        stack.Children.Add(Ui.Card(pasteCard));
+        // Keep the list and selection state above the secondary paste tools so
+        // imported bookmarks are visible without scrolling past the whole page.
+        stack.Children.Add(_status);
+        stack.Children.Add(_list);
+        _list.SelectionChanged += (_, _) => UpdateSelectionStatus();
 
         var actionRow = new StackPanel
         {
@@ -97,11 +103,33 @@ public sealed class BookmarksPage : Page
         actionRow.Children.Add(_cancel);
         stack.Children.Add(actionRow);
 
+        stack.Children.Add(Ui.Text("下载队列", 18, bold: true));
+        stack.Children.Add(
+            new ScrollViewer
+            {
+                Content = _queueHost,
+                MaxHeight = 220,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            }
+        );
         stack.Children.Add(_progress);
-        stack.Children.Add(_status);
         stack.Children.Add(_info);
-        stack.Children.Add(_list);
-        _list.SelectionChanged += (_, _) => UpdateSelectionStatus();
+
+        var pasteCard = new StackPanel { Spacing = 8 };
+        pasteCard.Children.Add(_pasteBox);
+        var addPasted = new Button { Content = "添加到列表" };
+        addPasted.Click += (_, _) => AddPastedLinks();
+        pasteCard.Children.Add(addPasted);
+        stack.Children.Add(
+            new Expander
+            {
+                Header = "粘贴链接（可选）",
+                IsExpanded = false,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Content = Ui.Card(pasteCard),
+            }
+        );
 
         scroll.Content = stack;
         Content = scroll;
@@ -294,6 +322,7 @@ public sealed class BookmarksPage : Page
         _cancel.IsEnabled = true;
         _progress.IsIndeterminate = false;
         _progress.Value = 0;
+        _queueHost.Children.Clear();
         var succeeded = 0;
         var failed = 0;
 
@@ -303,6 +332,24 @@ public sealed class BookmarksPage : Page
             {
                 token.ThrowIfCancellationRequested();
                 var item = items[i];
+                var row = new QueueRow(item.Display, item.Url);
+                row.CancelRequested += () =>
+                {
+                    try
+                    {
+                        _cts?.Cancel();
+                    }
+                    catch
+                    {
+                        // Already disposed.
+                    }
+                };
+                _queueHost.Children.Insert(0, row.Root);
+                while (_queueHost.Children.Count > 30)
+                {
+                    _queueHost.Children.RemoveAt(_queueHost.Children.Count - 1);
+                }
+
                 _status.Text = $"[{i + 1}/{items.Count}] 正在解析 {item.Display}";
                 try
                 {
@@ -310,23 +357,28 @@ public sealed class BookmarksPage : Page
                         item.Url,
                         token
                     );
+                    row.UpdateTitle(preview.Title);
                     _status.Text = $"[{i + 1}/{items.Count}] 正在下载 {preview.Title}";
+                    var progress = new Progress<DownloadProgress>(row.Update);
                     var folder = await AppServices.Instance.Downloader.DownloadAsync(
                         preview,
                         AppServices.Instance.Settings,
-                        progress: null,
+                        progress,
                         token
                     );
                     succeeded++;
+                    row.Complete(folder);
                     _status.Text = $"[{i + 1}/{items.Count}] 完成：{folder}";
                 }
                 catch (OperationCanceledException)
                 {
+                    row.Cancelled();
                     throw;
                 }
                 catch (Exception ex)
                 {
                     failed++;
+                    row.Fail(ex.Message);
                     _status.Text = $"[{i + 1}/{items.Count}] 失败：{ex.Message}";
                 }
 
@@ -349,6 +401,7 @@ public sealed class BookmarksPage : Page
             _cts = null;
             _cancel.IsEnabled = false;
             UpdateButtons();
+            UpdateSelectionStatus();
         }
     }
 }

@@ -7,6 +7,7 @@ namespace WnacgDownloader;
 
 public sealed class MainWindow : Window
 {
+    private bool _didInitialResize;
     private readonly NavigationView _nav = new();
     private readonly DownloadPage _downloadPage = new();
     private readonly BookmarksPage _bookmarksPage = new();
@@ -29,7 +30,33 @@ public sealed class MainWindow : Window
         }
         try
         {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            WindowSizing.Apply(hwnd);
             AppWindow.Resize(new Windows.Graphics.SizeInt32(1400, 950));
+            // Windows may restore an old window placement when the window is
+            // first shown, overriding the Resize above. Apply the desired
+            // initial size once the window is actually activated.
+            Activated += (_, _) =>
+            {
+                if (_didInitialResize)
+                {
+                    return;
+                }
+
+                _didInitialResize = true;
+                try
+                {
+                    var size = AppWindow.Size;
+                    if (size.Width < 1100 || size.Height < 700)
+                    {
+                        AppWindow.Resize(new Windows.Graphics.SizeInt32(1400, 950));
+                    }
+                }
+                catch
+                {
+                    // Window sizing is best-effort.
+                }
+            };
         }
         catch
         {

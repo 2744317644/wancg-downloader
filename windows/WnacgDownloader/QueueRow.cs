@@ -7,6 +7,7 @@ namespace WnacgDownloader;
 
 public sealed class QueueRow
 {
+    private readonly TextBlock _title;
     private readonly TextBlock _status;
     private readonly ProgressBar _bar;
     private readonly Button _cancel;
@@ -19,6 +20,7 @@ public sealed class QueueRow
 
     public QueueRow(string title, string referer)
     {
+        _title = Ui.Text(title, 14, bold: true);
         _status = Ui.Secondary("等待中…", 12);
         _bar = new ProgressBar
         {
@@ -37,7 +39,7 @@ public sealed class QueueRow
         };
 
         var text = new StackPanel { Spacing = 6 };
-        text.Children.Add(Ui.Text(title, 14, bold: true));
+        text.Children.Add(_title);
         text.Children.Add(_status);
         text.Children.Add(_bar);
 
@@ -65,6 +67,11 @@ public sealed class QueueRow
             Padding = new Thickness(14),
             Child = grid,
         };
+    }
+
+    public void UpdateTitle(string title)
+    {
+        Ui.OnUI(() => _title.Text = title);
     }
 
     public void Update(DownloadProgress progress)

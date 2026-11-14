@@ -26,9 +26,15 @@ public sealed class DownloadPage : Page
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Padding = new Thickness(24),
         };
-        var stack = new StackPanel { Spacing = 14 };
+        var stack = new StackPanel
+        {
+            Spacing = 14,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
         stack.Children.Add(Ui.Heading("下载"));
         stack.Children.Add(
             Ui.Secondary(
