@@ -35,6 +35,7 @@ struct ContentView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
+                .floatingTabBarContentInset()
                 .scrollDismissesKeyboard(.interactively)
                 .task { refreshRecentFiles() }
                 .onReceive(
@@ -375,7 +376,7 @@ struct ContentView: View {
                 Text(item.name)
                     .font(.caption)
                     .lineLimit(1)
-                Text("\(item.sizeLabel) · \(item.dateLabel)")
+                Text("\(item.kindLabel) · \(item.sizeLabel) · \(item.dateLabel)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -510,7 +511,11 @@ private struct RecentDownload: Identifiable {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
     var dateLabel: String {
-        date.formatted(date: .abbreviated, time: .shortened)
+        AppDateFormatting.dateTime(date)
+    }
+
+    var kindLabel: String {
+        isPDF ? "PDF" : "ZIP"
     }
 }
 

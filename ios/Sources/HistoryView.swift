@@ -92,6 +92,7 @@ struct HistoryView: View {
                         }
                     }
                     .listStyle(.insetGrouped)
+                    .floatingTabBarContentInset()
                 }
             }
             .background(AppBackground())
@@ -137,7 +138,7 @@ struct HistoryView: View {
                     if let pages = entry.pages {
                         Text("\(pages)P")
                     }
-                    Text(entry.viewedAt, format: .dateTime.hour().minute())
+                    Text(AppDateFormatting.time(entry.viewedAt))
                     Text(entry.viewedAt, style: .relative)
                 }
                 .font(.caption2)
@@ -152,8 +153,6 @@ struct HistoryView: View {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) { return "今天" }
         if calendar.isDateInYesterday(date) { return "昨天" }
-        return date.formatted(
-            .dateTime.year().month().day().weekday(.abbreviated)
-        )
+        return AppDateFormatting.dateWithWeekday(date)
     }
 }

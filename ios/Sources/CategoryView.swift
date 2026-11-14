@@ -297,6 +297,7 @@ struct CategoryView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 24)
             }
+            .floatingTabBarContentInset()
             .scrollIndicators(.hidden)
             .refreshable {
                 isRefreshing = true

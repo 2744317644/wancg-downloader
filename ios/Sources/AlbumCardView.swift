@@ -70,6 +70,7 @@ struct AlbumSkeletonCard: View {
 struct HomeCover: View {
     let album: HomeAlbum
     @State private var image: UIImage?
+    @State private var isLoading = false
 
     var body: some View {
         ZStack {
@@ -81,6 +82,10 @@ struct HomeCover: View {
                     .resizable()
                     .interpolation(.low)
                     .scaledToFill()
+            } else if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.secondary)
             } else {
                 Image(systemName: "photo")
                     .font(.title3)
@@ -98,6 +103,8 @@ struct HomeCover: View {
                 image = cached
                 return
             }
+            isLoading = true
+            defer { isLoading = false }
             try? await Task.sleep(nanoseconds: 80_000_000)
             guard !Task.isCancelled else { return }
             let loaded = await CoverImageStore.shared.image(

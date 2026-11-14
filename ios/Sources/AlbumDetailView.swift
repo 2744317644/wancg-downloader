@@ -107,6 +107,7 @@ struct AlbumDetailView: View {
             }
             .padding(16)
         }
+        .floatingTabBarContentInset()
         .background(background)
         .overlay(alignment: .bottom) {
             if let copiedTag {
@@ -204,55 +205,59 @@ struct AlbumDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            HomeCover(album: album)
-                .frame(width: 140, height: 187)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 8) {
+                Text(displayTitle)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(3)
+                    // Keep native text selection: a contextMenu here used
+                    // to swallow the long-press, so users could not select
+                    // and copy only part of the title.
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(displayTitle)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(4)
-                        // Keep native text selection: a contextMenu here used
-                        // to swallow the long-press, so users could not select
-                        // and copy only part of the title.
-                        .textSelection(.enabled)
-
-                    Button {
-                        copyTitle()
-                    } label: {
-                        Image(systemName: didCopyTitle
-                            ? "checkmark.circle.fill" : "doc.on.doc")
-                            .font(.caption)
-                            .foregroundStyle(didCopyTitle ? Color.mint : Color.secondary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("复制标题")
-                }
-
-                if let category = model.preview?.category, !category.isEmpty {
-                    Text(category)
+                Button {
+                    copyTitle()
+                } label: {
+                    Image(systemName: didCopyTitle
+                        ? "checkmark.circle.fill" : "doc.on.doc")
                         .font(.caption)
-                        .foregroundStyle(.mint)
+                        .foregroundStyle(didCopyTitle ? Color.mint : Color.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-
-                infoLine(
-                    "doc.text", "\(model.preview?.pages ?? album.pages ?? 0) 页"
-                )
-                if let favorites = model.preview?.favorites {
-                    infoLine("heart", "\(favorites)")
-                }
-                if let uploader = model.preview?.uploader, !uploader.isEmpty {
-                    infoLine("person", uploader)
-                }
-                if let uploaded = model.preview?.uploaded, !uploaded.isEmpty {
-                    infoLine("calendar", uploaded)
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("复制标题")
             }
-            Spacer(minLength: 0)
+
+            HStack(alignment: .top, spacing: 14) {
+                HomeCover(album: album)
+                    .frame(width: 140, height: 187)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    if let category = model.preview?.category, !category.isEmpty {
+                        Text(category)
+                            .font(.caption)
+                            .foregroundStyle(.mint)
+                    }
+
+                    infoLine(
+                        "doc.text",
+                        "\(model.preview?.pages ?? album.pages ?? 0) 页"
+                    )
+                    if let favorites = model.preview?.favorites {
+                        infoLine("heart", "\(favorites)")
+                    }
+                    if let uploader = model.preview?.uploader, !uploader.isEmpty {
+                        infoLine("person", uploader)
+                    }
+                    if let uploaded = model.preview?.uploaded, !uploaded.isEmpty {
+                        infoLine("calendar", uploaded)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
         }
     }
 

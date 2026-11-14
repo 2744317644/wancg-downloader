@@ -311,6 +311,7 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 28)
             }
+            .floatingTabBarContentInset()
             .background(background)
             .navigationTitle("发现")
             .navigationBarTitleDisplayMode(.inline)

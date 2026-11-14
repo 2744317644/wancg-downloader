@@ -153,6 +153,7 @@ struct SettingsView: View {
                     Text("关于")
                 }
             }
+            .floatingTabBarContentInset()
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
             .seamlessNavigationBar()

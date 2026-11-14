@@ -69,6 +69,7 @@ struct FilesView: View {
                         .onDelete(perform: delete)
                     }
                     .listStyle(.insetGrouped)
+                    .floatingTabBarContentInset()
                 }
             }
             .background(AppBackground())
@@ -127,7 +128,7 @@ struct FilesView: View {
                     Text(ByteCountFormatter.string(
                         fromByteCount: file.size, countStyle: .file
                     ))
-                    Text(file.date, style: .date)
+                    Text(AppDateFormatting.date(file.date))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)

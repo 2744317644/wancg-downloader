@@ -33,6 +33,7 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(.mint)
+        .environment(\.locale, AppDateFormatting.chineseLocale)
         .task {
             downloadModel.resumeQueueIfNeeded()
         }
