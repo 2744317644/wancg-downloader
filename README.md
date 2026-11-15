@@ -118,6 +118,14 @@ GitHub Actions 每次构建都会先跑一个 macOS smoke test：
 
 完整原理、配置与排错见：[docs/ios-simulator-ci-guide.md](docs/ios-simulator-ci-guide.md)。
 
+### iPhone 真机控制与调试（Windows）
+
+在 Windows 上可以通过 `pymobiledevice3` 直接查看 iPhone 屏幕、点击/滑动/输入和截图，
+不需要 Xcode；实时画面在浏览器里用 `serve-web` 操作。
+
+完整命令、坐标换算、`serve-web` 使用和常见问题见：
+[docs/iphone-control.md](docs/iphone-control.md)。
+
 ### 本地构建（需要 Mac）
 
 需要 **Xcode 26.3+**（iOS 26 SDK）。GitHub Actions 使用 `macos-15` runner，
