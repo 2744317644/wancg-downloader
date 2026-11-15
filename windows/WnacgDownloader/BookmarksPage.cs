@@ -325,6 +325,7 @@ public sealed class BookmarksPage : Page
         _queueHost.Children.Clear();
         var succeeded = 0;
         var failed = 0;
+        PowerKeepAwake.Acquire();
 
         try
         {
@@ -370,14 +371,23 @@ public sealed class BookmarksPage : Page
                     row.Complete(folder);
                     _status.Text = $"[{i + 1}/{items.Count}] 完成：{folder}";
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
                     row.Cancelled();
                     throw;
                 }
+                catch (OperationCanceledException ex)
+                {
+                    // HttpClient timeout, not a user-requested stop.
+                    failed++;
+                    AppDiagnostics.Exception("bookmark-download-timeout", ex);
+                    row.Fail("网络请求超时或被中断");
+                    _status.Text = $"[{i + 1}/{items.Count}] 超时：{item.Display}";
+                }
                 catch (Exception ex)
                 {
                     failed++;
+                    AppDiagnostics.Exception("bookmark-download-failed", ex);
                     row.Fail(ex.Message);
                     _status.Text = $"[{i + 1}/{items.Count}] 失败：{ex.Message}";
                 }
@@ -397,6 +407,7 @@ public sealed class BookmarksPage : Page
         }
         finally
         {
+            PowerKeepAwake.Release();
             _cts.Dispose();
             _cts = null;
             _cancel.IsEnabled = false;

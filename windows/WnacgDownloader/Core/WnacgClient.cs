@@ -77,7 +77,10 @@ public sealed class WnacgClient : IDisposable
 
         _http = new HttpClient(handler)
         {
-            Timeout = TimeSpan.FromSeconds(120),
+            // A single stuck request previously blocked for two minutes and
+            // looked like the download had frozen. Fail sooner; the UI now
+            // reports a timeout explicitly instead of showing "已取消".
+            Timeout = TimeSpan.FromSeconds(45),
         };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
         _http.DefaultRequestHeaders.AcceptLanguage.ParseAdd("zh-CN,zh;q=0.9,en;q=0.7");
@@ -336,13 +339,26 @@ public sealed class WnacgClient : IDisposable
             {
                 throw;
             }
-            catch (Exception ex) when (attempt < 3)
+            catch (Exception ex)
             {
                 lastError = ex;
+                WnacgDownloader.AppDiagnostics.Log(
+                    "http-error",
+                    $"attempt={attempt}/3 url={url} error={ex.GetType().Name}: {ex.Message}"
+                );
+                if (attempt >= 3)
+                {
+                    break;
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
             }
         }
 
+        WnacgDownloader.AppDiagnostics.Log(
+            "http-failed",
+            $"url={url} error={lastError?.GetType().Name}: {lastError?.Message}"
+        );
         throw new WnacgException(
             $"访问失败：{url}\n{lastError?.Message ?? "未知错误"}"
         );

@@ -239,6 +239,11 @@ public sealed class DownloadPage : Page
         CancellationTokenSource cts
     )
     {
+        AppDiagnostics.Log(
+            "download",
+            $"start aid={preview.Aid} title={preview.Title} url={preview.PageUrl}"
+        );
+        PowerKeepAwake.Acquire();
         try
         {
             var progress = new Progress<DownloadProgress>(row.Update);
@@ -248,18 +253,37 @@ public sealed class DownloadPage : Page
                 progress,
                 cts.Token
             );
+            AppDiagnostics.Log("download", $"complete aid={preview.Aid} folder={folder}");
             row.Complete(folder);
+        }
+        catch (OperationCanceledException) when (!cts.IsCancellationRequested)
+        {
+            // HttpClient timeout is reported as OperationCanceledException,
+            // but it is NOT the user pressing Cancel. Showing "已取消" here
+            // made a timed-out first download look like it had stopped.
+            const string message = "网络请求超时或被中断（不是手动停止）";
+            AppDiagnostics.Log("download", $"timeout aid={preview.Aid}");
+            row.Fail(message);
+            Ui.ShowInfo(
+                _info,
+                "下载超时：站点连接被中断。请检查「设置」里的网络模式（系统代理 / DoH）后重试。",
+                InfoBarSeverity.Warning
+            );
         }
         catch (OperationCanceledException)
         {
+            AppDiagnostics.Log("download", $"cancelled aid={preview.Aid}");
             row.Cancelled();
         }
         catch (Exception ex)
         {
+            AppDiagnostics.Exception("download-failed", ex);
             row.Fail(ex.Message);
+            Ui.ShowInfo(_info, "下载失败：" + ex.Message, InfoBarSeverity.Error);
         }
         finally
         {
+            PowerKeepAwake.Release();
             cts.Dispose();
         }
     }
